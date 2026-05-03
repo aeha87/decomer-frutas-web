@@ -40,7 +40,9 @@ export default function App() {
   const [orders, setOrders] = useState<any[]>([]);
   const [bcvRate, setBcvRate] = useState(36.50);
   const [cart, setCart] = useState<any[]>([]);
-  const [view, setView] = useState('login');
+  
+  // INICIAMOS DIRECTAMENTE EN EL CATÁLOGO ('app')
+  const [view, setView] = useState('app');
 
   useEffect(() => {
     const fetchBcv = async () => {
@@ -66,8 +68,8 @@ export default function App() {
         }
         setView('app');
       } else {
+        // SI NO HAY USUARIO, LO DEJAMOS EN NULL PERO MANTENEMOS LA VISTA 'app' (CATÁLOGO)
         setCurrentUser(null);
-        setView('login');
       }
       setLoadingAuth(false);
     });
@@ -75,8 +77,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!currentUser) return;
-
+    // SIEMPRE CARGAMOS LOS PRODUCTOS Y CATEGORÍAS (Para el catálogo público)
     const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
       setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -86,7 +87,8 @@ export default function App() {
     });
 
     let unsubOrders = () => {};
-    if (currentUser.role === 'admin') {
+    // SOLO CARGAMOS LOS PEDIDOS SI ES EL ADMINISTRADOR
+    if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
         const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setOrders(sortedOrders);
@@ -115,7 +117,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col font-sans">
-      <Navbar user={currentUser} onLogout={handleLogout} cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} bcvRate={bcvRate} setBcvRate={setBcvRate} />
+      <Navbar user={currentUser} onLogout={handleLogout} cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} bcvRate={bcvRate} setBcvRate={setBcvRate} onLoginClick={() => setView('login')} />
       <main className="flex-grow container mx-auto px-4 py-8">
         {currentUser?.role === 'admin' ? (
           <AdminDashboard products={products} categories={categories} orders={orders} bcvRate={bcvRate} />
@@ -161,10 +163,10 @@ function AuthScreen({ view, setView }: any) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden relative">
         <div className="bg-white p-6 text-center border-b border-stone-100 flex flex-col items-center">
           <img src="/logo.png" alt="Decomer Frutas" className="h-32 w-auto object-contain" />
-          <p className="text-stone-500 font-medium mt-2">Arreglos, chocolates y detalles</p>
+          <p className="text-stone-500 font-medium mt-2">Acceso Administrativo</p>
         </div>
         
         <div className="p-8">
@@ -210,23 +212,21 @@ function AuthScreen({ view, setView }: any) {
             )}
 
             <button type="submit" disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-3 rounded-xl transition-colors shadow-lg mt-6">
-              {isLoading ? 'Cargando...' : (view === 'login' ? 'Ingresar' : 'Registrarme')}
+              {isLoading ? 'Cargando...' : (view === 'login' ? 'Ingresar al Panel' : 'Registrarme')}
             </button>
           </form>
 
-          <p className="text-center mt-6 text-gray-600">
-            {view === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
-            <button onClick={() => {setView(view === 'login' ? 'register' : 'login'); setErrorMsg('');}} className="ml-2 text-red-600 font-semibold hover:underline">
-              {view === 'login' ? 'Regístrate' : 'Inicia Sesión'}
-            </button>
-          </p>
+          {/* BOTÓN PARA REGRESAR AL CATÁLOGO */}
+          <button onClick={() => setView('app')} className="mt-6 flex items-center justify-center gap-2 text-stone-400 hover:text-stone-600 font-medium text-sm w-full transition-colors">
+            <X className="w-4 h-4" /> Volver al Catálogo Público
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate }: any) {
+function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onLoginClick }: any) {
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50 print:hidden">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
@@ -245,28 +245,34 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate }: any) {
             )}
           </div>
 
-          <div className="text-sm text-gray-600 hidden md:block">
-            Hola, <span className="font-semibold text-gray-800">{user?.name || user?.email.split('@')[0]}</span>
-            <span className="ml-2 px-2 py-1 bg-stone-100 rounded-full text-xs text-stone-500 border border-stone-200">
-              {user?.role === 'admin' ? 'Admin' : 'Cliente'}
-            </span>
-          </div>
-
-          {user?.role === 'client' && (
-            <div className="relative text-stone-600 hover:text-red-600 transition-colors cursor-pointer" onClick={() => document.getElementById('cart-section')?.scrollIntoView({behavior: 'smooth'})}>
-              <ShoppingCart className="w-6 h-6" />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </div>
+          {user?.role === 'admin' ? (
+            <>
+              <div className="text-sm text-gray-600 hidden md:block">
+                Hola, <span className="font-semibold text-gray-800">{user.name || 'Admin'}</span>
+                <span className="ml-2 px-2 py-1 bg-stone-100 rounded-full text-xs text-stone-500 border border-stone-200">Admin</span>
+              </div>
+              <button onClick={onLogout} className="flex items-center gap-2 text-stone-500 hover:text-red-600 transition-colors">
+                <LogOut className="w-5 h-5" />
+                <span className="hidden sm:block text-sm font-medium">Salir</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="relative text-stone-600 hover:text-red-600 transition-colors cursor-pointer" onClick={() => document.getElementById('cart-section')?.scrollIntoView({behavior: 'smooth'})}>
+                <ShoppingCart className="w-6 h-6" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </div>
+              
+              {/* BOTÓN DISCRETO PARA QUE EL ADMIN INGRESE */}
+              <button onClick={onLoginClick} title="Ingreso Administrativo" className="flex items-center gap-2 text-stone-400 hover:text-stone-800 transition-colors ml-2">
+                <User className="w-5 h-5" />
+              </button>
+            </>
           )}
-
-          <button onClick={onLogout} className="flex items-center gap-2 text-stone-500 hover:text-red-600 transition-colors">
-            <LogOut className="w-5 h-5" />
-            <span className="hidden sm:block text-sm font-medium">Salir</span>
-          </button>
         </div>
       </div>
     </nav>
