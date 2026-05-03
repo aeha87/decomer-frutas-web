@@ -1130,7 +1130,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
 
   const handleCheckout = async (e: any) => {
     e.preventDefault();
-    const phone = "584122190994";
+    const phone = "584125296272";
     const orderDisplayId = `PED-${Math.floor(Math.random() * 10000)}`;
     
     // GUARDAR EN FIREBASE CON NUEVOS CAMPOS
