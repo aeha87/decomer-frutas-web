@@ -17,6 +17,9 @@ const firebaseConfig = {
   appId: "1:398908357282:web:80fa1cac178cd1c0b5f5fb"
 };
 
+// --- PEGA AQUÍ TU API KEY DE IMGBB (Entre las comillas) ---
+const IMGBB_API_KEY = "19641e99aad23c4e7f45f6540efa1f50";
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -29,17 +32,16 @@ const VENEZUELAN_BANKS = [
 ];
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [bcvRate, setBcvRate] = useState(36.50);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState<any[]>([]);
   const [view, setView] = useState('login');
 
-  // Consulta automática de la Tasa BCV oficial
   useEffect(() => {
     const fetchBcv = async () => {
       try {
@@ -53,7 +55,6 @@ export default function App() {
     fetchBcv();
   }, []);
 
-  // --- ESCUCHA DE AUTENTICACIÓN FIREBASE ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -73,7 +74,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- SINCRONIZACIÓN DE BASE DE DATOS EN TIEMPO REAL ---
   useEffect(() => {
     if (!currentUser) return;
 
@@ -88,8 +88,7 @@ export default function App() {
     let unsubOrders = () => {};
     if (currentUser.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
-        // Ordenar pedidos por fecha (más recientes primero)
-        const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.date) - new Date(a.date));
+        const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setOrders(sortedOrders);
       });
     }
@@ -129,13 +128,12 @@ export default function App() {
   );
 }
 
-// --- COMPONENTES DE AUTENTICACIÓN ---
-function AuthScreen({ view, setView }) {
+function AuthScreen({ view, setView }: any) {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', address: '' });
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setErrorMsg('');
     setIsLoading(true);
@@ -148,11 +146,10 @@ function AuthScreen({ view, setView }) {
           name: formData.name,
           phone: formData.phone,
           address: formData.address,
-          // Cualquier correo con "admin" será administrador, sino cliente normal
           role: formData.email.toLowerCase().includes('admin') ? 'admin' : 'client'
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       if(error.code === 'auth/invalid-credential') setErrorMsg("Correo o contraseña incorrectos.");
       else if(error.code === 'auth/email-already-in-use') setErrorMsg("Este correo ya está registrado.");
       else setErrorMsg(error.message);
@@ -160,14 +157,14 @@ function AuthScreen({ view, setView }) {
     setIsLoading(false);
   };
 
-  const handleChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
+  const handleChange = (e: any) => setFormData({...formData, [e.target.name]: e.target.value});
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="bg-red-600 p-8 text-center">
-          <h1 className="text-3xl font-bold text-white tracking-wider font-serif">Decomer Frutas</h1>
-          <p className="text-red-100 mt-2">Arreglos, chocolates y detalles</p>
+        <div className="bg-white p-6 text-center border-b border-stone-100 flex flex-col items-center">
+          <img src="/logo.png" alt="Decomer Frutas" className="h-32 w-auto object-contain" />
+          <p className="text-stone-500 font-medium mt-2">Arreglos, chocolates y detalles</p>
         </div>
         
         <div className="p-8">
@@ -185,34 +182,34 @@ function AuthScreen({ view, setView }) {
             {view === 'register' && (
               <div className="relative">
                 <User className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-                <input required type="text" name="name" placeholder="Nombre completo" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all" />
+                <input required type="text" name="name" placeholder="Nombre completo" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all" />
               </div>
             )}
             
             <div className="relative">
               <Mail className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-              <input required type="email" name="email" placeholder="Correo electrónico" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all" />
+              <input required type="email" name="email" placeholder="Correo electrónico" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all" />
             </div>
 
             <div className="relative">
               <Lock className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-              <input required type="password" name="password" placeholder="Contraseña" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all" />
+              <input required type="password" name="password" placeholder="Contraseña" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all" />
             </div>
 
             {view === 'register' && (
               <>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-                  <input required type="tel" name="phone" placeholder="Teléfono" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all" />
+                  <input required type="tel" name="phone" placeholder="Teléfono" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all" />
                 </div>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-                  <input required type="text" name="address" placeholder="Dirección predeterminada" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all" />
+                  <input required type="text" name="address" placeholder="Dirección" onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all" />
                 </div>
               </>
             )}
 
-            <button type="submit" disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-red-200 mt-6">
+            <button type="submit" disabled={isLoading} className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-3 rounded-xl transition-colors shadow-lg mt-6">
               {isLoading ? 'Cargando...' : (view === 'login' ? 'Ingresar' : 'Registrarme')}
             </button>
           </form>
@@ -229,16 +226,12 @@ function AuthScreen({ view, setView }) {
   );
 }
 
-// --- BARRA DE NAVEGACIÓN Y FOOTER ---
-function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate }) {
+function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate }: any) {
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white shadow-md">
-            <span className="font-serif font-bold text-xl">D</span>
-          </div>
-          <span className="text-2xl font-bold text-red-600 font-serif hidden sm:block">Decomer Frutas</span>
+          <img src="/logo.png" alt="Decomer Frutas" className="h-14 w-auto" />
         </div>
         
         <div className="flex items-center gap-4 sm:gap-6">
@@ -295,8 +288,7 @@ function Footer() {
   );
 }
 
-// --- VISTA ADMINISTRATIVO ---
-function AdminDashboard({ products, categories, orders, bcvRate }) {
+function AdminDashboard({ products, categories, orders, bcvRate }: any) {
   const [activeTab, setActiveTab] = useState('kpis');
 
   return (
@@ -331,7 +323,7 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
       <div className="flex-1">
         {activeTab === 'kpis' && <AdminKPIs orders={orders} bcvRate={bcvRate} />}
         {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
-        {activeTab === 'products' && <AdminProducts products={products} categories={categories} bcvRate={bcvRate} />}
+        {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
         {activeTab === 'categories' && <AdminCategories categories={categories} />}
         {activeTab === 'messages' && <AdminMessages />}
       </div>
@@ -339,10 +331,10 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
   );
 }
 
-function AdminKPIs({ orders, bcvRate }) {
-  const totalVentasUSD = orders.filter(o => o.status !== 'Cancelado').reduce((sum, o) => sum + o.totalUSD, 0);
+function AdminKPIs({ orders, bcvRate }: any) {
+  const totalVentasUSD = orders.filter((o: any) => o.status !== 'Cancelado').reduce((sum: any, o: any) => sum + o.totalUSD, 0);
   const totalVentasBs = totalVentasUSD * bcvRate;
-  const pedidosPendientes = orders.filter(o => o.status === 'Pendiente').length;
+  const pedidosPendientes = orders.filter((o: any) => o.status === 'Pendiente').length;
 
   return (
     <div className="space-y-6">
@@ -385,36 +377,36 @@ function AdminKPIs({ orders, bcvRate }) {
   );
 }
 
-function AdminOrders({ orders, bcvRate, products }) {
-  const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null });
-  const [paymentForm, setPaymentForm] = useState({ method: 'Pago Móvil', reference: '', phone: '', bank: VENEZUELAN_BANKS[0], amountUSD: '' });
-  const [viewPaymentsModal, setViewPaymentsModal] = useState({ isOpen: false, order: null });
+function AdminOrders({ orders, bcvRate, products }: any) {
+  const [paymentModal, setPaymentModal] = useState<any>({ isOpen: false, orderId: null });
+  const [paymentForm, setPaymentForm] = useState({ method: 'Pago Móvil', reference: '', phone: '', bank: VENEZUELAN_BANKS[0], amountUSD: '' as string | number });
+  const [viewPaymentsModal, setViewPaymentsModal] = useState<any>({ isOpen: false, order: null });
 
   const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
-  const [manualOrder, setManualOrder] = useState({ customerName: '', phone: '', address: '', notes: '', items: [] });
+  const [manualOrder, setManualOrder] = useState({ customerName: '', phone: '', address: '', notes: '', items: [] as any[] });
   const [manualProduct, setManualProduct] = useState('');
-  const [manualQty, setManualQty] = useState(1);
+  const [manualQty, setManualQty] = useState<string | number>(1);
 
-  const handleStatusChange = async (id, newStatus) => {
+  const handleStatusChange = async (id: string, newStatus: string) => {
     await updateDoc(doc(db, 'orders', id), { status: newStatus });
   };
 
-  const openPaymentModal = (order) => {
-    const totalPaid = (order.payments || []).reduce((sum, p) => sum + p.amountUSD, 0);
+  const openPaymentModal = (order: any) => {
+    const totalPaid = (order.payments || []).reduce((sum: number, p: any) => sum + p.amountUSD, 0);
     const balance = order.totalUSD - totalPaid;
     setPaymentForm({ method: 'Pago Móvil', reference: '', phone: '', bank: VENEZUELAN_BANKS[0], amountUSD: balance > 0 ? balance : 0 });
     setPaymentModal({ isOpen: true, orderId: order.id });
   };
 
-  const handleRegisterPayment = async (e) => {
+  const handleRegisterPayment = async (e: any) => {
     e.preventDefault();
-    const order = orders.find(o => o.id === paymentModal.orderId);
+    const order = orders.find((o: any) => o.id === paymentModal.orderId);
     if (!order) return;
 
     const newPayment = {
       method: paymentForm.method,
       reference: paymentForm.reference,
-      amountUSD: parseFloat(paymentForm.amountUSD),
+      amountUSD: parseFloat(paymentForm.amountUSD as string),
       details: (paymentForm.method === 'Pago Móvil' || paymentForm.method === 'Transferencia Bs') 
                ? `Origen: ${paymentForm.bank} - Tlf: ${paymentForm.phone}` 
                : (paymentForm.bank && ['Zelle', 'Zinli', 'Binance'].includes(paymentForm.method) ? `Origen: ${paymentForm.bank}` : ''),
@@ -422,7 +414,7 @@ function AdminOrders({ orders, bcvRate, products }) {
     };
     
     const updatedPayments = [...(order.payments || []), newPayment];
-    const totalPaid = updatedPayments.reduce((sum, p) => sum + p.amountUSD, 0);
+    const totalPaid = updatedPayments.reduce((sum: number, p: any) => sum + p.amountUSD, 0);
     
     let newStatus = order.status;
     if (totalPaid >= order.totalUSD) newStatus = 'Pagado';
@@ -444,21 +436,25 @@ function AdminOrders({ orders, bcvRate, products }) {
   const handleAddManualItem = () => {
     const productId = manualProduct || (products.length > 0 ? products[0].id : null);
     if (!productId) return;
-    const product = products.find(p => p.id === productId);
+    const product = products.find((p: any) => p.id === productId);
     if (!product) return;
     
     const existingIndex = manualOrder.items.findIndex(i => i.id === product.id);
     let newItems = [...manualOrder.items];
     if (existingIndex >= 0) {
-      newItems[existingIndex].quantity += parseInt(manualQty);
+      newItems[existingIndex].quantity += parseInt(manualQty as string);
     } else {
-      newItems.push({ ...product, quantity: parseInt(manualQty) });
+      newItems.push({ ...product, quantity: parseInt(manualQty as string) });
     }
     setManualOrder({ ...manualOrder, items: newItems });
     setManualQty(1);
   };
 
-  const handleCreateManualOrder = async (e) => {
+  const handleRemoveManualItem = (index: number) => {
+    setManualOrder({ ...manualOrder, items: manualOrder.items.filter((_, i) => i !== index) });
+  }
+
+  const handleCreateManualOrder = async (e: any) => {
     e.preventDefault();
     if (manualOrder.items.length === 0) return alert("Debes agregar al menos un producto.");
     
@@ -482,7 +478,7 @@ function AdminOrders({ orders, bcvRate, products }) {
     setManualOrder({ customerName: '', phone: '', address: '', notes: '', items: [] });
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch(status) {
       case 'Pendiente': return 'bg-orange-100 text-orange-700';
       case 'Abonado': return 'bg-yellow-100 text-yellow-700';
@@ -518,8 +514,8 @@ function AdminOrders({ orders, bcvRate, products }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
-            {orders.map(order => {
-              const totalPaid = (order.payments || []).reduce((sum, p) => sum + p.amountUSD, 0);
+            {orders.map((order: any) => {
+              const totalPaid = (order.payments || []).reduce((sum: number, p: any) => sum + p.amountUSD, 0);
               const balance = order.totalUSD - totalPaid;
               
               return (
@@ -571,10 +567,9 @@ function AdminOrders({ orders, bcvRate, products }) {
         </table>
       </div>
 
-      {/* Modal Pasarela de Pagos Administrativa */}
-      {paymentModal.isOpen && orders.find(o => o.id === paymentModal.orderId) && (() => {
-        const activeOrder = orders.find(o => o.id === paymentModal.orderId);
-        const totalPaid = (activeOrder.payments || []).reduce((sum, p) => sum + p.amountUSD, 0);
+      {paymentModal.isOpen && orders.find((o: any) => o.id === paymentModal.orderId) && (() => {
+        const activeOrder = orders.find((o: any) => o.id === paymentModal.orderId);
+        const totalPaid = (activeOrder.payments || []).reduce((sum: number, p: any) => sum + p.amountUSD, 0);
         const balance = activeOrder.totalUSD - totalPaid;
 
         return (
@@ -599,7 +594,7 @@ function AdminOrders({ orders, bcvRate, products }) {
               {activeOrder.payments?.length > 0 && (
                 <div className="mb-4 space-y-2">
                   <p className="text-xs font-bold text-gray-700 uppercase">Pagos Registrados:</p>
-                  {activeOrder.payments.map((p, i) => (
+                  {activeOrder.payments.map((p: any, i: number) => (
                     <div key={i} className="flex justify-between items-center bg-green-50 border border-green-100 p-2 rounded text-sm">
                       <div>
                         <span className="font-bold text-green-800">${p.amountUSD.toFixed(2)}</span>
@@ -629,7 +624,7 @@ function AdminOrders({ orders, bcvRate, products }) {
                     <label className="block text-xs font-medium text-gray-600 mb-1">Monto Pagado (USD)</label>
                     <input required type="number" step="0.01" max={balance} value={paymentForm.amountUSD} onChange={e => setPaymentForm({...paymentForm, amountUSD: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-sm" />
                     {(paymentForm.method === 'Pago Móvil' || paymentForm.method === 'Transferencia Bs') && paymentForm.amountUSD && (
-                      <p className="text-[11px] text-blue-600 font-bold mt-1 bg-blue-50 px-2 py-1 rounded">Equivalente: Bs. {(parseFloat(paymentForm.amountUSD) * bcvRate).toFixed(2)}</p>
+                      <p className="text-[11px] text-blue-600 font-bold mt-1 bg-blue-50 px-2 py-1 rounded">Equivalente: Bs. {(parseFloat(paymentForm.amountUSD as string) * bcvRate).toFixed(2)}</p>
                     )}
                   </div>
                 </div>
@@ -670,6 +665,32 @@ function AdminOrders({ orders, bcvRate, products }) {
         );
       })()}
 
+      {viewPaymentsModal.isOpen && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50">
+              <h3 className="text-lg font-bold text-gray-800">Historial de Pagos</h3>
+              <button onClick={() => setViewPaymentsModal({ isOpen: false, order: null })} className="text-stone-400 hover:text-gray-800"><X className="w-6 h-6" /></button>
+            </div>
+            <div className="p-5 overflow-y-auto">
+              <div className="space-y-3">
+                {viewPaymentsModal.order.payments?.map((p: any, i: number) => (
+                  <div key={i} className="p-3 border border-stone-200 rounded-lg bg-stone-50">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-bold text-sm text-gray-800">{p.method}</span>
+                      <span className="font-bold text-green-600">${p.amountUSD.toFixed(2)}</span>
+                    </div>
+                    {p.reference && <p className="text-xs text-stone-500">Ref: {p.reference}</p>}
+                    {p.details && <p className="text-xs text-stone-500">{p.details}</p>}
+                    <p className="text-[10px] text-stone-400 mt-1">{new Date(p.date).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isManualOrderOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -700,7 +721,7 @@ function AdminOrders({ orders, bcvRate, products }) {
                     <div className="flex-1 w-full">
                       <select value={manualProduct} onChange={e => setManualProduct(e.target.value)} className="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs bg-white">
                         <option value="">Selecciona un producto...</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.name} - ${p.price}</option>)}
+                        {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} - ${p.price}</option>)}
                       </select>
                     </div>
                     <div className="w-full sm:w-20">
@@ -733,13 +754,60 @@ function AdminOrders({ orders, bcvRate, products }) {
   );
 }
 
-function AdminProducts({ products, categories, bcvRate }) {
+function AdminProducts({ products, categories }: any) {
   const [isEditing, setIsEditing] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState({ name: '', price: '', image: '', description: '', categoryId: '' });
+  const [currentProduct, setCurrentProduct] = useState({ id: '', name: '', price: '', image: '', description: '', categoryId: '' });
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  const handleSaveProduct = async (e) => {
+  // --- SUBIDA A IMGBB ---
+  const handleImageUpload = async (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!IMGBB_API_KEY || IMGBB_API_KEY.includes('PEGAR_AQUI')) {
+      alert("Por favor, pon tu API Key de ImgBB en el código primero.");
+      return;
+    }
+
+    setUploadProgress(10); // Iniciando carga
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      setUploadProgress(60); 
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setCurrentProduct({...currentProduct, image: data.data.url});
+        setUploadProgress(100);
+        setTimeout(() => setUploadProgress(0), 1500);
+      } else {
+        alert("Error al subir imagen. Revisa tu API Key de ImgBB.");
+        setUploadProgress(0);
+      }
+    } catch (error) {
+      console.error("Error upload:", error);
+      alert("Error de conexión al subir la imagen.");
+      setUploadProgress(0);
+    }
+  };
+
+  const handleSaveProduct = async (e: any) => {
     e.preventDefault();
-    const productData = { ...currentProduct, price: parseFloat(currentProduct.price) };
+    const productData = { 
+      name: currentProduct.name,
+      price: parseFloat(currentProduct.price),
+      image: currentProduct.image,
+      description: currentProduct.description,
+      categoryId: currentProduct.categoryId
+    };
+    
     if (currentProduct.id) {
       await updateDoc(doc(db, 'products', currentProduct.id), productData);
     } else {
@@ -748,7 +816,7 @@ function AdminProducts({ products, categories, bcvRate }) {
     setIsEditing(false);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if(window.confirm('¿Seguro que deseas eliminar este producto?')) await deleteDoc(doc(db, 'products', id));
   };
 
@@ -759,7 +827,7 @@ function AdminProducts({ products, categories, bcvRate }) {
           <h2 className="text-2xl font-bold text-gray-800">Catálogo de Productos</h2>
           <p className="text-stone-500">Añade o edita tus arreglos</p>
         </div>
-        <button onClick={() => { setCurrentProduct({ name: '', price: '', image: '', description: '', categoryId: categories[0]?.id || '' }); setIsEditing(true); }}
+        <button onClick={() => { setCurrentProduct({ id: '', name: '', price: '', image: '', description: '', categoryId: categories[0]?.id || '' }); setIsEditing(true); }}
           className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors text-sm"
         >
           <Plus className="w-4 h-4" /> Nuevo Producto
@@ -780,20 +848,32 @@ function AdminProducts({ products, categories, bcvRate }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
               <select required value={currentProduct.categoryId} onChange={e => setCurrentProduct({...currentProduct, categoryId: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">URL Imagen</label>
-              <input required type="url" value={currentProduct.image} onChange={e => setCurrentProduct({...currentProduct, image: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
+            
+            <div className="bg-stone-50 p-3 rounded-lg border border-stone-200">
+              <label className="block text-sm font-bold text-gray-700 mb-1">Imagen del Producto (Alojamiento Gratuito)</label>
+              
+              <div className="mb-2">
+                <label className="bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold py-2 px-4 rounded cursor-pointer transition-colors inline-block">
+                  + Subir Foto
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                </label>
+                {uploadProgress > 0 && <span className="text-xs text-blue-600 ml-2 font-bold">Procesando... {Math.round(uploadProgress)}%</span>}
+              </div>
+
+              <input required type="url" placeholder="URL generada de ImgBB..." value={currentProduct.image} onChange={e => setCurrentProduct({...currentProduct, image: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white text-stone-500" />
+              {currentProduct.image && <img src={currentProduct.image} alt="Preview" className="h-16 mt-2 rounded object-cover" />}
             </div>
+
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-              <textarea required value={currentProduct.description} onChange={e => setCurrentProduct({...currentProduct, description: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" rows="2" />
+              <textarea required value={currentProduct.description} onChange={e => setCurrentProduct({...currentProduct, description: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" rows={2} />
             </div>
             <div className="md:col-span-2 flex justify-end gap-3 mt-2">
               <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-              <button type="submit" className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg">Guardar</button>
+              <button type="submit" className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg">Guardar Producto</button>
             </div>
           </form>
         </div>
@@ -809,7 +889,7 @@ function AdminProducts({ products, categories, bcvRate }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
-            {products.map(product => (
+            {products.map((product: any) => (
               <tr key={product.id}>
                 <td className="p-4 flex items-center gap-3">
                   <img src={product.image} alt={product.name} className="w-10 h-10 rounded-lg object-cover bg-stone-200 shrink-0" />
@@ -829,10 +909,10 @@ function AdminProducts({ products, categories, bcvRate }) {
   );
 }
 
-function AdminCategories({ categories }) {
+function AdminCategories({ categories }: any) {
   const [newCategory, setNewCategory] = useState('');
 
-  const handleAdd = async (e) => {
+  const handleAdd = async (e: any) => {
     e.preventDefault();
     if(newCategory.trim()) {
       await addDoc(collection(db, 'categories'), { name: newCategory.trim() });
@@ -840,7 +920,7 @@ function AdminCategories({ categories }) {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if(window.confirm('¿Eliminar esta categoría?')) await deleteDoc(doc(db, 'categories', id));
   };
 
@@ -853,7 +933,7 @@ function AdminCategories({ categories }) {
           <button type="submit" className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm">Agregar</button>
         </form>
         <ul className="divide-y divide-stone-100 border-t border-stone-100">
-          {categories.map(cat => (
+          {categories.map((cat: any) => (
             <li key={cat.id} className="py-3 flex justify-between items-center group">
               <span className="font-medium text-gray-700 flex items-center gap-2"><Tag className="w-4 h-4 text-stone-400" /> {cat.name}</span>
               <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 className="w-4 h-4" /></button>
@@ -865,7 +945,6 @@ function AdminCategories({ categories }) {
   );
 }
 
-// Simulación de mensajes (Igual que antes)
 function AdminMessages() {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-stone-100 h-[calc(100vh-10rem)] min-h-[500px] flex items-center justify-center text-stone-400">
@@ -877,28 +956,27 @@ function AdminMessages() {
   );
 }
 
-// --- VISTA CLIENTE ---
-function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }) {
+function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }: any) {
   const [checkoutStep, setCheckoutStep] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [deliveryInfo, setDeliveryInfo] = useState({ name: user?.name || '', phone: user?.phone || '', address: user?.address || '', notes: '' });
-  const [clientPayments, setClientPayments] = useState([]);
-  const [currentPayment, setCurrentPayment] = useState({ method: 'Zelle', reference: '', amountUSD: '', bank: VENEZUELAN_BANKS[0], phone: '' });
+  const [clientPayments, setClientPayments] = useState<any[]>([]);
+  const [currentPayment, setCurrentPayment] = useState({ method: 'Zelle', reference: '', amountUSD: '' as string | number, bank: VENEZUELAN_BANKS[0], phone: '' });
 
-  const addToCart = (product) => {
-    const existing = cart.find(item => item.id === product.id);
-    if (existing) setCart(cart.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
+  const addToCart = (product: any) => {
+    const existing = cart.find((item: any) => item.id === product.id);
+    if (existing) setCart(cart.map((item: any) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
     else setCart([...cart, { ...product, quantity: 1 }]);
   };
 
-  const updateQuantity = (id, delta) => setCart(cart.map(item => item.id === id ? { ...item, quantity: item.quantity + delta } : item).filter(item => item.quantity > 0));
+  const updateQuantity = (id: string, delta: number) => setCart(cart.map((item: any) => item.id === id ? { ...item, quantity: item.quantity + delta } : item).filter((item: any) => item.quantity > 0));
   
-  const totalUSD = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const totalPaidUSD = clientPayments.reduce((sum, p) => sum + parseFloat(p.amountUSD), 0);
+  const totalUSD = cart.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+  const totalPaidUSD = clientPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUSD), 0);
   const balanceUSD = totalUSD - totalPaidUSD;
 
   const handleAddPayment = () => {
-    const amount = parseFloat(currentPayment.amountUSD);
+    const amount = parseFloat(currentPayment.amountUSD as string);
     if (!amount || amount <= 0) return alert("Monto inválido");
     if (amount > balanceUSD + 0.01) return alert("Supera la deuda");
     
@@ -910,12 +988,11 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
     setCurrentPayment({ method: 'Zelle', reference: '', amountUSD: '', bank: VENEZUELAN_BANKS[0], phone: '' });
   };
 
-  const handleCheckout = async (e) => {
+  const handleCheckout = async (e: any) => {
     e.preventDefault();
     const phone = "584122190994";
     const orderDisplayId = `PED-${Math.floor(Math.random() * 10000)}`;
     
-    // GUARDAR EN FIREBASE
     await addDoc(collection(db, 'orders'), {
       displayId: orderDisplayId,
       customerName: deliveryInfo.name,
@@ -929,11 +1006,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
       notes: deliveryInfo.notes
     });
 
-    // GENERAR MENSAJE WHATSAPP
     let text = `*¡Hola! Nuevo Pedido en Decomer Frutas* 🍓🍫\n\n*Orden:* #${orderDisplayId}\n*Mis Datos:*\n👤 Nombre: ${deliveryInfo.name}\n📱 Teléfono: ${deliveryInfo.phone}\n📍 Dirección: ${deliveryInfo.address}\n`;
     if(deliveryInfo.notes) text += `📝 Notas: ${deliveryInfo.notes}\n`;
     text += `\n*Mi Pedido:*\n`;
-    cart.forEach(item => { text += `▪️ ${item.quantity}x ${item.name} ($${parseFloat(item.price).toFixed(2)})\n`; });
+    cart.forEach((item: any) => { text += `▪️ ${item.quantity}x ${item.name} ($${parseFloat(item.price).toFixed(2)})\n`; });
     text += `\n*Total:* $${totalUSD.toFixed(2)} (Bs. ${(totalUSD * bcvRate).toFixed(2)})\n`;
     
     text += `\n*Pagos:*\n`;
@@ -948,7 +1024,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
     setCart([]); setClientPayments([]); setCheckoutStep(false);
   };
 
-  const filteredProducts = selectedCategory === 'all' ? products : products.filter(p => p.categoryId === selectedCategory);
+  const filteredProducts = selectedCategory === 'all' ? products : products.filter((p: any) => p.categoryId === selectedCategory);
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 animate-fade-in relative">
@@ -956,13 +1032,13 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
         <h2 className="text-3xl font-bold text-gray-800 mb-6 font-serif">Nuestro Catálogo</h2>
         <div className="flex overflow-x-auto gap-2 mb-6 pb-2 no-scrollbar">
           <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-full text-sm font-medium ${selectedCategory === 'all' ? 'bg-red-600 text-white' : 'bg-white text-stone-600'}`}>Todos</button>
-          {categories.map(cat => (
+          {categories.map((cat: any) => (
             <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-4 py-2 rounded-full text-sm font-medium ${selectedCategory === cat.id ? 'bg-red-600 text-white' : 'bg-white text-stone-600'}`}>{cat.name}</button>
           ))}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProducts.map(product => (
+          {filteredProducts.map((product: any) => (
             <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col">
               <div className="h-48 bg-stone-100"><img src={product.image} className="w-full h-full object-cover" /></div>
               <div className="p-5 flex flex-col flex-grow">
@@ -982,14 +1058,13 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
         </div>
       </div>
 
-      {/* Carrito Resumen */}
       <div id="cart-section" className="w-full lg:w-96 shrink-0">
         <div className="bg-white rounded-2xl shadow-md border border-stone-100 sticky top-24 overflow-hidden flex flex-col max-h-[calc(100vh-8rem)]">
           <div className="bg-stone-900 p-5 text-white flex items-center justify-between">
             <h3 className="text-lg font-bold flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Mi Pedido</h3>
           </div>
           <div className="p-5 flex-grow overflow-y-auto">
-            {cart.map(item => (
+            {cart.map((item: any) => (
               <div key={item.id} className="flex gap-3 items-center mb-4">
                 <img src={item.image} className="w-14 h-14 rounded-lg object-cover" />
                 <div className="flex-1">
@@ -1035,8 +1110,8 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
                       <select value={currentPayment.method} onChange={e=>setCurrentPayment({...currentPayment, method:e.target.value})} className="w-full px-2 py-2 border rounded text-xs bg-white">
                         <option value="Zelle">Zelle</option><option value="Pago Móvil">Pago Móvil</option><option value="Efectivo Divisas">Efectivo Divisas</option>
                       </select>
-                      <input type="number" step="0.01" max={balanceUSD} placeholder={`Monto USD (Resta $${balanceUSD})`} value={currentPayment.amountUSD} onChange={e=>setCurrentPayment({...currentPayment, amountUSD:e.target.value})} className="w-full px-2 py-2 border rounded text-xs"/>
-                      {currentPayment.method === 'Pago Móvil' && currentPayment.amountUSD && <p className="text-[10px] text-blue-600 font-bold">Transferir: Bs. {(currentPayment.amountUSD * bcvRate).toFixed(2)}</p>}
+                      <input type="number" step="0.01" max={balanceUSD} placeholder={`Monto USD (Resta $${balanceUSD.toFixed(2)})`} value={currentPayment.amountUSD} onChange={e=>setCurrentPayment({...currentPayment, amountUSD:e.target.value})} className="w-full px-2 py-2 border rounded text-xs"/>
+                      {currentPayment.method === 'Pago Móvil' && currentPayment.amountUSD && <p className="text-[10px] text-blue-600 font-bold">Transferir: Bs. {(parseFloat(currentPayment.amountUSD as string) * bcvRate).toFixed(2)}</p>}
                       <button type="button" onClick={handleAddPayment} className="w-full bg-stone-800 text-white text-xs py-2 rounded font-bold">Añadir Pago</button>
                     </div>
                   )}
