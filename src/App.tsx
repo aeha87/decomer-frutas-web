@@ -1192,7 +1192,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
     <div className="flex flex-col lg:flex-row gap-8 animate-fade-in relative">
       
       {/* BOTÓN FLOTANTE WHATSAPP */}
-      <a href="https://wa.me/584122190994" target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:bg-[#1ebd5a] transition-transform hover:scale-110 z-40 flex items-center justify-center print:hidden group">
+      <a href="https://wa.me/584125296272" target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:bg-[#1ebd5a] transition-transform hover:scale-110 z-40 flex items-center justify-center print:hidden group">
         <MessageCircle className="w-7 h-7" />
       </a>
 
