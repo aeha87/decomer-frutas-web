@@ -17,7 +17,7 @@ const firebaseConfig = {
   appId: "1:398908357282:web:80fa1cac178cd1c0b5f5fb"
 };
 
-// --- PEGA AQUÍ TU API KEY DE IMGBB (Entre las comillas) ---
+// --- LLAVE DE IMGBB YA CONFIGURADA ---
 const IMGBB_API_KEY = "19641e99aad23c4e7f45f6540efa1f50";
 
 const app = initializeApp(firebaseConfig);
