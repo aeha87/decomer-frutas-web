@@ -4,7 +4,7 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, si
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDoc, setDoc } from "firebase/firestore";
 import { 
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Image as ImageIcon,
-  CheckCircle, Menu, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, Filter, MessageSquare, Send, Video
+  CheckCircle, Menu, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, Filter, MessageSquare, Send, Video, Printer
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -228,7 +228,7 @@ function AuthScreen({ view, setView }: any) {
 
 function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate }: any) {
   return (
-    <nav className="bg-white shadow-sm sticky top-0 z-50">
+    <nav className="bg-white shadow-sm sticky top-0 z-50 print:hidden">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="Decomer Frutas" className="h-14 w-auto" />
@@ -275,7 +275,7 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate }: any) {
 
 function Footer() {
   return (
-    <footer className="bg-stone-900 text-stone-300 py-8 text-center mt-auto">
+    <footer className="bg-stone-900 text-stone-300 py-8 text-center mt-auto print:hidden">
       <div className="container mx-auto px-4 flex flex-col items-center justify-center gap-4">
         <p className="font-serif text-xl text-white">Decomer Frutas</p>
         <p className="text-sm max-w-md">Especialistas en arreglos frutales, fresas con chocolate y desayunos sorpresa. ¡Endulzamos tus mejores momentos!</p>
@@ -289,11 +289,11 @@ function Footer() {
 }
 
 function AdminDashboard({ products, categories, orders, bcvRate }: any) {
-  const [activeTab, setActiveTab] = useState('kpis');
+  const [activeTab, setActiveTab] = useState('orders');
 
   return (
     <div className="animate-fade-in flex flex-col md:flex-row gap-6">
-      <div className="w-full md:w-64 shrink-0">
+      <div className="w-full md:w-64 shrink-0 print:hidden">
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 sticky top-24">
           <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-4 px-3">Gestión de Tienda</h3>
           <nav className="space-y-1">
@@ -381,6 +381,9 @@ function AdminOrders({ orders, bcvRate, products }: any) {
   const [paymentModal, setPaymentModal] = useState<any>({ isOpen: false, orderId: null });
   const [paymentForm, setPaymentForm] = useState({ method: 'Pago Móvil', reference: '', phone: '', bank: VENEZUELAN_BANKS[0], amountUSD: '' as string | number });
   const [viewPaymentsModal, setViewPaymentsModal] = useState<any>({ isOpen: false, order: null });
+  
+  // NUEVO: ESTADO PARA EL RECIBO
+  const [receiptModal, setReceiptModal] = useState<any>({ isOpen: false, order: null });
 
   const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
   const [manualOrder, setManualOrder] = useState({ customerName: '', phone: '', address: '', notes: '', items: [] as any[] });
@@ -492,7 +495,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Control de Pedidos</h2>
           <p className="text-stone-500">Gestiona y cruza pagos con pedidos</p>
@@ -502,7 +505,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
         </button>
       </div>
       
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-x-auto">
+      <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-x-auto print:hidden">
         <table className="w-full text-left border-collapse whitespace-nowrap">
           <thead>
             <tr className="bg-stone-50 text-stone-600 text-sm border-b border-stone-100">
@@ -544,11 +547,11 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                     </button>
                   )}
                 </td>
-                <td className="p-4">
+                <td className="p-4 flex items-center gap-2">
                   <select 
                     value={order.status}
                     onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                    className={`text-sm font-medium px-2.5 py-1 rounded-lg border-0 outline-none cursor-pointer ${getStatusColor(order.status)}`}
+                    className={`text-sm font-medium px-2.5 py-1.5 rounded-lg border-0 outline-none cursor-pointer ${getStatusColor(order.status)}`}
                   >
                     <option value="Pendiente">Pendiente</option>
                     <option value="Abonado">Abonado</option>
@@ -557,6 +560,15 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                     <option value="Completado">Completado</option>
                     <option value="Cancelado">Cancelado</option>
                   </select>
+                  
+                  {/* BOTÓN DE IMPRIMIR RECIBO */}
+                  <button 
+                    onClick={() => setReceiptModal({ isOpen: true, order })}
+                    className="p-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg transition-colors"
+                    title="Imprimir Nota de Entrega"
+                  >
+                    <Printer className="w-5 h-5" />
+                  </button>
                 </td>
               </tr>
             )})}
@@ -567,13 +579,95 @@ function AdminOrders({ orders, bcvRate, products }: any) {
         </table>
       </div>
 
+      {/* --- MODAL DEL RECIBO (Imprimible) --- */}
+      {receiptModal.isOpen && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60] print:bg-white print:p-0">
+          <style>{`
+            @media print {
+              body * { visibility: hidden; }
+              .print-container, .print-container * { visibility: visible; }
+              .print-container { position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding: 0; box-shadow: none; border: none; }
+            }
+          `}</style>
+          
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] print-container">
+            <div className="p-4 border-b border-stone-100 flex justify-between items-center bg-stone-50 print:hidden">
+              <h3 className="text-lg font-bold text-gray-800">Nota de Entrega</h3>
+              <button onClick={() => setReceiptModal({ isOpen: false, order: null })} className="text-stone-400 hover:text-gray-800"><X className="w-6 h-6" /></button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto bg-white" id="receipt-content">
+              <div className="text-center mb-6">
+                <img src="/logo.png" alt="Decomer Frutas" className="h-20 mx-auto mb-3 object-contain" />
+                <h2 className="font-serif font-bold text-2xl text-gray-900">Decomer Frutas</h2>
+                <p className="text-xs text-stone-500 uppercase tracking-widest mt-1">Arreglos & Chocolates</p>
+                <div className="mt-4 inline-block bg-stone-100 px-3 py-1 rounded text-sm font-bold text-gray-800">
+                  ORDEN: {receiptModal.order.displayId}
+                </div>
+              </div>
+
+              <div className="border-t border-b border-dashed border-stone-300 py-4 mb-4 space-y-1">
+                <p className="text-sm text-gray-800"><strong className="text-gray-500">Fecha:</strong> {new Date(receiptModal.order.date).toLocaleString()}</p>
+                <p className="text-sm text-gray-800"><strong className="text-gray-500">Cliente:</strong> {receiptModal.order.customerName}</p>
+                <p className="text-sm text-gray-800"><strong className="text-gray-500">Teléfono:</strong> {receiptModal.order.phone}</p>
+                <p className="text-sm text-gray-800"><strong className="text-gray-500">Dirección:</strong> {receiptModal.order.address}</p>
+              </div>
+
+              {receiptModal.order.notes && (
+                <div className="bg-red-50 border border-red-100 p-3 rounded-lg mb-4">
+                  <p className="text-xs font-bold text-red-800 mb-1 uppercase">📝 Dedicatoria / Notas:</p>
+                  <p className="text-sm text-gray-800 italic">"{receiptModal.order.notes}"</p>
+                </div>
+              )}
+
+              <table className="w-full text-sm mb-6">
+                <thead>
+                  <tr className="border-b border-stone-200 text-stone-500 uppercase text-xs">
+                    <th className="text-left py-2 font-medium">Cant.</th>
+                    <th className="text-left py-2 font-medium">Producto</th>
+                    <th className="text-right py-2 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {receiptModal.order.items.map((item: any, idx: number) => (
+                    <tr key={idx}>
+                      <td className="py-3 font-bold text-gray-700">{item.quantity}</td>
+                      <td className="py-3 text-gray-800 pr-2">{item.name}</td>
+                      <td className="text-right py-3 font-bold text-gray-800">${(item.price * item.quantity).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="text-right border-t border-stone-300 pt-4 mb-6">
+                <p className="text-sm text-stone-500 mb-1">Total a Pagar</p>
+                <p className="font-black text-3xl text-gray-900">${receiptModal.order.totalUSD.toFixed(2)}</p>
+                <p className="text-sm font-bold text-stone-500 mt-1">Bs. {(receiptModal.order.totalUSD * bcvRate).toFixed(2)}</p>
+              </div>
+
+              <div className="text-center mt-8 text-xs text-stone-400">
+                <p>¡Gracias por preferir a Decomer Frutas!</p>
+                <p className="mt-1">Instagram: @decomerfrutas</p>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-stone-100 bg-stone-50 print:hidden shrink-0">
+              <button onClick={() => window.print()} className="w-full bg-stone-900 hover:bg-black text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                <Printer className="w-5 h-5" /> Imprimir Recibo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE PAGOS */}
       {paymentModal.isOpen && orders.find((o: any) => o.id === paymentModal.orderId) && (() => {
         const activeOrder = orders.find((o: any) => o.id === paymentModal.orderId);
         const totalPaid = (activeOrder.payments || []).reduce((sum: number, p: any) => sum + p.amountUSD, 0);
         const balance = activeOrder.totalUSD - totalPaid;
 
         return (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 shrink-0">
               <h3 className="text-lg font-bold text-gray-800">Registrar Pago</h3>
@@ -666,7 +760,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
       })()}
 
       {viewPaymentsModal.isOpen && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50">
               <h3 className="text-lg font-bold text-gray-800">Historial de Pagos</h3>
@@ -692,7 +786,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
       )}
 
       {isManualOrderOpen && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 shrink-0">
               <h3 className="text-lg font-bold text-gray-800">Crear Pedido Manual</h3>
