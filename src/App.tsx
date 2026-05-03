@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDoc, setDoc } from "firebase/firestore";
 import { 
-  ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Image as ImageIcon,
+  ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook, Image as ImageIcon,
   CheckCircle, Menu, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, Filter, MessageSquare, Send, Video, Printer,
   Search, MessageCircle, Heart
 } from 'lucide-react';
@@ -276,14 +276,34 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onLoginClick }
 
 function Footer() {
   return (
-    <footer className="bg-stone-900 text-stone-300 py-8 text-center mt-auto print:hidden">
-      <div className="container mx-auto px-4 flex flex-col items-center justify-center gap-4">
-        <p className="font-serif text-2xl text-white font-bold tracking-wide">Decomer Frutas</p>
-        <p className="text-sm max-w-md text-stone-400">Especialistas en arreglos frutales, fresas con chocolate y desayunos sorpresa. ¡Endulzamos tus mejores momentos!</p>
-        <a href="https://www.instagram.com/decomerfrutas/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-pink-400 hover:text-pink-300 transition-transform hover:scale-110 mt-2 bg-stone-800 px-4 py-2 rounded-full shadow-lg">
-          <Instagram className="w-5 h-5" />
-          <span className="font-medium">@decomerfrutas</span>
-        </a>
+    <footer className="bg-stone-900 text-stone-300 py-10 text-center mt-auto print:hidden">
+      <div className="container mx-auto px-4 flex flex-col items-center justify-center gap-6">
+        <div className="space-y-2">
+          <p className="font-serif text-3xl text-white font-bold tracking-wide">Decomer Frutas</p>
+          <p className="text-sm max-w-md text-stone-400 mx-auto">Especialistas en arreglos frutales, fresas con chocolate y desayunos sorpresa. ¡Endulzamos tus mejores momentos!</p>
+        </div>
+        
+        <div className="flex flex-wrap justify-center gap-4 mt-2">
+          {/* INSTAGRAM */}
+          <a href="https://www.instagram.com/decomerfrutas/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-pink-400 hover:text-pink-300 transition-transform hover:scale-110 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg">
+            <Instagram className="w-5 h-5" />
+            <span className="font-medium text-sm">Instagram</span>
+          </a>
+          
+          {/* FACEBOOK */}
+          <a href="https://www.facebook.com/DecomerFrutasMCBO" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-transform hover:scale-110 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg">
+            <Facebook className="w-5 h-5" />
+            <span className="font-medium text-sm">Facebook</span>
+          </a>
+
+          {/* TIKTOK */}
+          <a href="https://www.tiktok.com/@decomer.frutas" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-white hover:text-gray-200 transition-transform hover:scale-110 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg">
+            <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+            </svg>
+            <span className="font-medium text-sm">TikTok</span>
+          </a>
+        </div>
       </div>
     </footer>
   );
