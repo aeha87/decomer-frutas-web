@@ -49,14 +49,14 @@ export default function App() {
   useEffect(() => {
     const unsubBcv = onSnapshot(doc(db, 'settings', 'bcv'), (docSnap) => {
       if (docSnap.exists() && docSnap.data().rate) {
-        setBcvRate(docSnap.data().rate);
+        setBcvRate(Number(docSnap.data().rate));
       } else {
         const fetchBcv = async () => {
           try {
             const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv');
             const data = await res.json();
             if (data?.monitors?.bcv?.price) {
-              const fetchedRate = data.monitors.bcv.price;
+              const fetchedRate = Number(data.monitors.bcv.price);
               setBcvRate(fetchedRate);
               setDoc(doc(db, 'settings', 'bcv'), { rate: fetchedRate }, { merge: true });
             }
@@ -100,7 +100,12 @@ export default function App() {
     let unsubOrders = () => {};
     if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
-        const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // BLINDAJE: Si la orden no tiene fecha válida, previene el crasheo asumiendo 0
+        const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => {
+          const timeA = a.date ? new Date(a.date).getTime() : 0;
+          const timeB = b.date ? new Date(b.date).getTime() : 0;
+          return timeB - timeA;
+        });
         setOrders(sortedOrders);
       });
     }
@@ -120,7 +125,7 @@ export default function App() {
   const handleSaveBcvRate = async (newRate: number) => {
     if (!newRate || isNaN(newRate)) return;
     try {
-      await setDoc(doc(db, 'settings', 'bcv'), { rate: newRate }, { merge: true });
+      await setDoc(doc(db, 'settings', 'bcv'), { rate: Number(newRate) }, { merge: true });
     } catch (error) {
       console.error("Error al guardar la tasa:", error);
     }
@@ -400,26 +405,28 @@ function AdminDashboard({ products, categories, orders, bcvRate }: any) {
 }
 
 function AdminKPIs({ orders, bcvRate }: any) {
-  // FECHAS
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
   const todayStr = now.toLocaleDateString();
 
-  // FILTROS
   const validOrders = orders.filter((o: any) => o.status !== 'Cancelado');
   
   const monthOrders = validOrders.filter((o: any) => {
+    if(!o.date) return false;
     const d = new Date(o.date);
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
 
-  const todayOrders = validOrders.filter((o: any) => new Date(o.date).toLocaleDateString() === todayStr);
+  const todayOrders = validOrders.filter((o: any) => {
+    if(!o.date) return false;
+    return new Date(o.date).toLocaleDateString() === todayStr;
+  });
 
-  // CALCULOS
-  const monthSalesUSD = monthOrders.reduce((sum: any, o: any) => sum + o.totalUSD, 0);
-  const todaySalesUSD = todayOrders.reduce((sum: any, o: any) => sum + o.totalUSD, 0);
-  const totalHistóricoUSD = validOrders.reduce((sum: any, o: any) => sum + o.totalUSD, 0);
+  // BLINDAJE: Number() asegura que si el totalUSD se guardó extraño o vacío, sea 0 para que Math no falle
+  const monthSalesUSD = monthOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
+  const todaySalesUSD = todayOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
+  const totalHistóricoUSD = validOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
   
   const pendientes = orders.filter((o: any) => o.status === 'Pendiente').length;
   const enPrep = orders.filter((o: any) => o.status === 'En Preparación').length;
@@ -431,7 +438,6 @@ function AdminKPIs({ orders, bcvRate }: any) {
         <p className="text-stone-500">Analiza el rendimiento en tiempo real</p>
       </div>
 
-      {/* METRICAS PRINCIPALES DEL MES */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="bg-gradient-to-br from-stone-900 to-stone-800 p-6 rounded-3xl shadow-lg text-white relative overflow-hidden">
           <div className="relative z-10">
@@ -489,17 +495,15 @@ function AdminKPIs({ orders, bcvRate }: any) {
 function AdminCustomers({ orders }: any) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Lógica CRM: Extraer clientes únicos de los pedidos
   const clientMap = new Map();
   
   orders.forEach((order: any) => {
     if(order.status === 'Cancelado') return;
 
-    // Tratar de obtener el dato más real del comprador (sender o customerName para web/manual)
-    const name = order.senderName || order.customerName || 'Cliente Anónimo';
-    const phone = order.senderPhone || order.phone || 'Sin Teléfono';
+    // BLINDAJE: String() asegura que no haya errores de tipo
+    const name = String(order.senderName || order.customerName || 'Cliente Anónimo');
+    const phone = String(order.senderPhone || order.phone || 'Sin Teléfono');
     
-    // Usar el teléfono como ID único si existe, sino el nombre
     const key = phone !== 'Sin Teléfono' ? phone : name.toLowerCase();
 
     if (!clientMap.has(key)) {
@@ -514,20 +518,21 @@ function AdminCustomers({ orders }: any) {
     
     const client = clientMap.get(key);
     client.totalOrders += 1;
-    client.totalSpent += order.totalUSD;
-    if (new Date(order.date) > new Date(client.lastOrder)) {
-      client.lastOrder = order.date;
-      // Actualizar nombre si en el último pedido puso otro
-      client.name = name; 
+    client.totalSpent += (Number(order.totalUSD) || 0);
+    
+    if (order.date && client.lastOrder) {
+      if (new Date(order.date) > new Date(client.lastOrder)) {
+        client.lastOrder = order.date;
+        client.name = name; 
+      }
     }
   });
 
-  // Convertir a Array y ordenar por los que más gastan (Los VIPs)
   const allCustomers = Array.from(clientMap.values()).sort((a: any, b: any) => b.totalSpent - a.totalSpent);
 
   const filteredCustomers = allCustomers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.phone.includes(searchTerm)
+    String(c.name).toLowerCase().includes(searchTerm.toLowerCase()) || 
+    String(c.phone).includes(searchTerm)
   );
 
   return (
@@ -575,10 +580,10 @@ function AdminCustomers({ orders }: any) {
                     </span>
                   </td>
                   <td className="p-4">
-                    <p className="font-black text-green-600">${client.totalSpent.toFixed(2)}</p>
+                    <p className="font-black text-green-600">${Number(client.totalSpent).toFixed(2)}</p>
                   </td>
                   <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
-                    {new Date(client.lastOrder).toLocaleDateString()}
+                    {client.lastOrder ? new Date(client.lastOrder).toLocaleDateString() : 'N/A'}
                   </td>
                   <td className="p-4 text-right">
                     {client.phone !== 'Sin Teléfono' && (
@@ -624,8 +629,9 @@ function AdminOrders({ orders, bcvRate, products }: any) {
   };
 
   const openPaymentModal = (order: any) => {
-    const totalPaid = (order.payments || []).reduce((sum: number, p: any) => sum + p.amountUSD, 0);
-    const balance = order.totalUSD - totalPaid;
+    const totalPaid = (order.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amountUSD) || 0), 0);
+    const orderTotal = Number(order.totalUSD) || 0;
+    const balance = orderTotal - totalPaid;
     setPaymentForm({ method: 'Pago Móvil', reference: '', phone: '', bank: VENEZUELAN_BANKS[0], amountUSD: balance > 0 ? balance : 0 });
     setPaymentModal({ isOpen: true, orderId: order.id });
   };
@@ -638,7 +644,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
     const newPayment = {
       method: paymentForm.method,
       reference: paymentForm.reference,
-      amountUSD: parseFloat(paymentForm.amountUSD as string),
+      amountUSD: Number(paymentForm.amountUSD),
       details: (paymentForm.method === 'Pago Móvil' || paymentForm.method === 'Transferencia Bs') 
                ? `Origen: ${paymentForm.bank} - Tlf: ${paymentForm.phone}` 
                : (paymentForm.bank && ['Zelle', 'Zinli', 'Binance'].includes(paymentForm.method) ? `Origen: ${paymentForm.bank}` : ''),
@@ -646,15 +652,16 @@ function AdminOrders({ orders, bcvRate, products }: any) {
     };
     
     const updatedPayments = [...(order.payments || []), newPayment];
-    const totalPaid = updatedPayments.reduce((sum: number, p: any) => sum + p.amountUSD, 0);
+    const totalPaid = updatedPayments.reduce((sum: number, p: any) => sum + (Number(p.amountUSD) || 0), 0);
+    const orderTotal = Number(order.totalUSD) || 0;
     
     let newStatus = order.status;
-    if (totalPaid >= order.totalUSD) newStatus = 'Pagado';
-    else if (totalPaid > 0 && totalPaid < order.totalUSD && order.status === 'Pendiente') newStatus = 'Abonado';
+    if (totalPaid >= orderTotal) newStatus = 'Pagado';
+    else if (totalPaid > 0 && totalPaid < orderTotal && order.status === 'Pendiente') newStatus = 'Abonado';
 
     await updateDoc(doc(db, 'orders', order.id), { status: newStatus, payments: updatedPayments });
     
-    const newBalance = order.totalUSD - totalPaid;
+    const newBalance = orderTotal - totalPaid;
     if (newBalance > 0) {
       setPaymentForm({ ...paymentForm, reference: '', amountUSD: newBalance, phone: '', bank: VENEZUELAN_BANKS[0] });
     } else {
@@ -670,8 +677,8 @@ function AdminOrders({ orders, bcvRate, products }: any) {
     
     const existingIndex = manualOrder.items.findIndex(i => i.id === product.id);
     let newItems = [...manualOrder.items];
-    if (existingIndex >= 0) newItems[existingIndex].quantity += parseInt(manualQty as string);
-    else newItems.push({ ...product, quantity: parseInt(manualQty as string) });
+    if (existingIndex >= 0) newItems[existingIndex].quantity += Number(manualQty);
+    else newItems.push({ ...product, quantity: Number(manualQty) });
     setManualOrder({ ...manualOrder, items: newItems });
     setManualQty(1);
   };
@@ -679,7 +686,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
   const handleCreateManualOrder = async (e: any) => {
     e.preventDefault();
     if (manualOrder.items.length === 0) return alert("Debes agregar al menos un producto.");
-    const totalUSD = manualOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalUSD = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
     await addDoc(collection(db, 'orders'), {
       displayId: `PED-M${Math.floor(Math.random() * 10000)}`,
       customerName: manualOrder.customerName,
@@ -708,12 +715,12 @@ function AdminOrders({ orders, bcvRate, products }: any) {
     }
   };
 
-  // --- LOGICA DE FILTRADO Y BÚSQUEDA ---
+  // BLINDAJE EN FILTROS: Cast seguro a String para evitar que teléfonos/IDs guardados como enteros rompan el .includes
   const filteredOrders = orders.filter((order: any) => {
     const matchesSearch = 
-      (order.displayId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.customerName || order.senderName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.phone || order.senderPhone || '').includes(searchTerm);
+      String(order.displayId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(order.customerName || order.senderName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(order.phone || order.senderPhone || '').includes(searchTerm);
       
     const matchesStatus = statusFilter === 'Todos' || order.status === statusFilter;
     
@@ -732,10 +739,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
         </button>
       </div>
 
-      {/* --- BARRA DE FILTROS --- */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-center print:hidden">
-        
-        {/* Pestañas rápidas de estado */}
         <div className="flex bg-stone-100 p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar">
           {['Todos', 'Pendiente', 'Pagado', 'En Preparación', 'Completado'].map(status => (
             <button 
@@ -748,7 +752,6 @@ function AdminOrders({ orders, bcvRate, products }: any) {
           ))}
         </div>
 
-        {/* Buscador */}
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input 
@@ -774,22 +777,23 @@ function AdminOrders({ orders, bcvRate, products }: any) {
           </thead>
           <tbody className="divide-y divide-stone-100">
             {filteredOrders.map((order: any) => {
-              const totalPaid = (order.payments || []).reduce((sum: number, p: any) => sum + p.amountUSD, 0);
-              const balance = order.totalUSD - totalPaid;
+              const totalPaid = (order.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amountUSD) || 0), 0);
+              const orderTotal = Number(order.totalUSD) || 0;
+              const balance = orderTotal - totalPaid;
               
               return (
               <tr key={order.id} className="hover:bg-stone-50/50 transition-colors">
                 <td className="p-4">
                   <div className="font-black text-gray-900">{order.displayId || 'PED-WEB'}</div>
-                  <div className="text-xs text-stone-500 font-medium">{new Date(order.date).toLocaleDateString()}</div>
+                  <div className="text-xs text-stone-500 font-medium">{order.date ? new Date(order.date).toLocaleDateString() : 'N/A'}</div>
                 </td>
                 <td className="p-4 text-sm text-gray-700">
                   <div className="font-bold flex items-center gap-1"><User className="w-3 h-3 text-stone-400"/> {order.senderName || order.customerName}</div>
                   <div className="text-stone-500 text-xs mt-0.5">📞 {order.senderPhone || order.phone}</div>
                 </td>
                 <td className="p-4">
-                  <div className="font-black text-gray-900">${order.totalUSD.toFixed(2)}</div>
-                  <div className="text-[10px] text-stone-500 font-bold bg-stone-100 inline-block px-2 py-0.5 rounded mt-1">Bs. {(order.totalUSD * bcvRate).toFixed(2)}</div>
+                  <div className="font-black text-gray-900">${orderTotal.toFixed(2)}</div>
+                  <div className="text-[10px] text-stone-500 font-bold bg-stone-100 inline-block px-2 py-0.5 rounded mt-1">Bs. {(orderTotal * bcvRate).toFixed(2)}</div>
                 </td>
                 <td className="p-4 text-sm">
                   {totalPaid > 0 ? (
@@ -834,8 +838,6 @@ function AdminOrders({ orders, bcvRate, products }: any) {
         </table>
       </div>
 
-      {/* --- RESTO DE MODALES DE PEDIDOS (Igual que antes, solo oculto para resumir, en tu código están listos) --- */}
-      {/* ... Modal Receipt ... */}
       {receiptModal.isOpen && (
         <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60] print:bg-white print:p-0">
           <style>{`@media print { body * { visibility: hidden; } .print-container, .print-container * { visibility: visible; } .print-container { position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding: 0; box-shadow: none; border: none; } }`}</style>
@@ -890,15 +892,15 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                     <tr key={idx}>
                       <td className="py-3 font-black text-gray-700">{item.quantity}</td>
                       <td className="py-3 text-gray-800 pr-2 font-medium">{item.isExtra ? '🎈 ' : ''}{item.name}</td>
-                      <td className="text-right py-3 font-bold text-gray-800">${(item.price * item.quantity).toFixed(2)}</td>
+                      <td className="text-right py-3 font-bold text-gray-800">${(Number(item.price) * item.quantity).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
 
               <div className="text-right border-t border-stone-300 pt-4 mb-6">
-                <p className="text-sm text-stone-500 mb-1 font-bold">Total Pagado</p>
-                <p className="font-black text-4xl text-gray-900">${receiptModal.order.totalUSD.toFixed(2)}</p>
+                <p className="text-sm text-stone-500 mb-1 font-bold">Total del Pedido</p>
+                <p className="font-black text-4xl text-gray-900">${(Number(receiptModal.order.totalUSD) || 0).toFixed(2)}</p>
               </div>
             </div>
             
@@ -911,10 +913,10 @@ function AdminOrders({ orders, bcvRate, products }: any) {
         </div>
       )}
 
-      {/* ... Modal Cobros ... */}
       {paymentModal.isOpen && orders.find((o: any) => o.id === paymentModal.orderId) && (() => {
         const activeOrder = orders.find((o: any) => o.id === paymentModal.orderId);
-        const balance = activeOrder.totalUSD - (activeOrder.payments || []).reduce((sum: number, p: any) => sum + p.amountUSD, 0);
+        const orderTotal = Number(activeOrder.totalUSD) || 0;
+        const balance = orderTotal - (activeOrder.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amountUSD) || 0), 0);
 
         return (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
@@ -989,7 +991,6 @@ function AdminOrders({ orders, bcvRate, products }: any) {
         );
       })()}
 
-      {/* Modal View Payments */}
       {viewPaymentsModal.isOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
@@ -1004,11 +1005,11 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                     <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
                     <div className="flex justify-between items-start mb-2">
                       <span className="font-bold text-sm text-green-900 bg-green-200 px-2 py-0.5 rounded-lg">{p.method}</span>
-                      <span className="font-black text-lg text-green-700">${p.amountUSD.toFixed(2)}</span>
+                      <span className="font-black text-lg text-green-700">${Number(p.amountUSD).toFixed(2)}</span>
                     </div>
                     {p.reference && <p className="text-xs text-stone-600 font-bold mt-1">Ref: {p.reference}</p>}
                     {p.details && <p className="text-xs text-stone-500 mt-0.5">{p.details}</p>}
-                    <p className="text-[10px] text-stone-400 mt-2 font-medium uppercase tracking-wider">{new Date(p.date).toLocaleString()}</p>
+                    <p className="text-[10px] text-stone-400 mt-2 font-medium uppercase tracking-wider">{p.date ? new Date(p.date).toLocaleString() : 'N/A'}</p>
                   </div>
                 ))}
               </div>
@@ -1017,7 +1018,6 @@ function AdminOrders({ orders, bcvRate, products }: any) {
         </div>
       )}
       
-      {/* Modal Manual Order */}
       {isManualOrderOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -1045,7 +1045,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                     <div className="flex-1 w-full">
                       <select value={manualProduct} onChange={e => setManualProduct(e.target.value)} className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white font-medium">
                         <option value="">Seleccionar del catálogo...</option>
-                        {products.map((p: any) => <option key={p.id} value={p.id}>{p.isExtra ? '🎈 Extra:' : ''} {p.name} - ${p.price}</option>)}
+                        {products.map((p: any) => <option key={p.id} value={p.id}>{p.isExtra ? '🎈 Extra:' : ''} {p.name} - ${Number(p.price).toFixed(2)}</option>)}
                       </select>
                     </div>
                     <div className="w-full sm:w-24">
@@ -1060,7 +1060,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                         <div key={idx} className="flex justify-between items-center bg-white border border-stone-100 p-3 rounded-xl shadow-sm">
                           <div className="font-medium text-sm text-gray-800"><span className="font-black bg-stone-100 px-2 py-0.5 rounded mr-2">{item.quantity}x</span> {item.name}</div>
                           <div className="flex items-center gap-4">
-                            <span className="font-black text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
+                            <span className="font-black text-gray-900">${(Number(item.price) * item.quantity).toFixed(2)}</span>
                             <button type="button" onClick={() => handleRemoveManualItem(idx)} className="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </div>
@@ -1137,7 +1137,7 @@ function AdminProducts({ products, categories }: any) {
     if(window.confirm('¿Seguro que deseas eliminar este producto/extra?')) await deleteDoc(doc(db, 'products', id));
   };
 
-  const filteredProducts = products.filter((p: any) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredProducts = products.filter((p: any) => String(p.name).toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1229,7 +1229,6 @@ function AdminProducts({ products, categories }: any) {
         </div>
       )}
 
-      {/* Barra de búsqueda de productos */}
       <div className="relative w-full sm:w-96">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
         <input 
@@ -1268,7 +1267,7 @@ function AdminProducts({ products, categories }: any) {
                 <td className="p-4 text-center">
                    {product.isExtra ? <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">Extra / Upsell</span> : <span className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1 rounded-full border border-stone-200">Catálogo</span>}
                 </td>
-                <td className="p-4 text-right font-black text-gray-900">${parseFloat(product.price).toFixed(2)}</td>
+                <td className="p-4 text-right font-black text-gray-900">${Number(product.price).toFixed(2)}</td>
                 <td className="p-4 flex justify-center gap-2">
                   <button onClick={() => {setCurrentProduct(product); setIsEditing(true); window.scrollTo({top:0, behavior:'smooth'});}} className="text-blue-600 bg-blue-50 hover:bg-blue-100 p-2.5 rounded-xl transition-colors"><Edit className="w-4 h-4" /></button>
                   <button onClick={() => handleDelete(product.id)} className="text-red-600 bg-red-50 hover:bg-red-100 p-2.5 rounded-xl transition-colors"><Trash2 className="w-4 h-4" /></button>
@@ -1370,12 +1369,12 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
 
   const updateQuantity = (id: string, delta: number) => setCart(cart.map((item: any) => item.id === id ? { ...item, quantity: item.quantity + delta } : item).filter((item: any) => item.quantity > 0));
   
-  const totalUSD = cart.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-  const totalPaidUSD = clientPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUSD), 0);
+  const totalUSD = cart.reduce((sum: number, item: any) => sum + (Number(item.price) * item.quantity), 0);
+  const totalPaidUSD = clientPayments.reduce((sum: number, p: any) => sum + Number(p.amountUSD), 0);
   const balanceUSD = totalUSD - totalPaidUSD;
 
   const handleAddPayment = () => {
-    const amount = parseFloat(currentPayment.amountUSD as string);
+    const amount = Number(currentPayment.amountUSD);
     if (!amount || amount <= 0) return alert("Monto inválido");
     if (amount > balanceUSD + 0.01) return alert("Supera la deuda");
     
@@ -1420,7 +1419,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     
     text += `*📦 PRODUCTOS:*\n`;
     cart.forEach((item: any) => { 
-      text += `▪️ ${item.quantity}x ${item.isExtra && item.emoji ? item.emoji : ''} ${item.name} ($${parseFloat(item.price).toFixed(2)})\n`; 
+      text += `▪️ ${item.quantity}x ${item.isExtra && item.emoji ? item.emoji : ''} ${item.name} ($${Number(item.price).toFixed(2)})\n`; 
     });
     
     text += `\n*💰 TOTAL:* $${totalUSD.toFixed(2)} (Bs. ${(totalUSD * bcvRate).toFixed(2)})\n`;
@@ -1430,7 +1429,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
       text += `▪️ Pendiente por pagar\n`;
     } else {
        clientPayments.forEach(p => { 
-         text += `▪️ ${p.method}: $${p.amountUSD.toFixed(2)} ${p.reference ? `(Ref: ${p.reference})` : ''}\n`; 
+         text += `▪️ ${p.method}: $${Number(p.amountUSD).toFixed(2)} ${p.reference ? `(Ref: ${p.reference})` : ''}\n`; 
        });
        if (balanceUSD > 0) text += `*Saldo Restante:* $${balanceUSD.toFixed(2)}\n`;
        else text += `*Estado:* PAGADO COMPLETO ✅\n`;
@@ -1445,12 +1444,12 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
 
   const filteredProducts = mainProducts.filter((p: any) => {
     const matchCategory = selectedCategory === 'all' || p.categoryId === selectedCategory;
-    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchSearch = String(p.name).toLowerCase().includes(searchQuery.toLowerCase());
     
     let matchPrice = true;
-    if (priceFilter === 'under20') matchPrice = parseFloat(p.price) < 20;
-    if (priceFilter === '20to40') matchPrice = parseFloat(p.price) >= 20 && parseFloat(p.price) <= 40;
-    if (priceFilter === 'premium') matchPrice = parseFloat(p.price) > 40;
+    if (priceFilter === 'under20') matchPrice = Number(p.price) < 20;
+    if (priceFilter === '20to40') matchPrice = Number(p.price) >= 20 && Number(p.price) <= 40;
+    if (priceFilter === 'premium') matchPrice = Number(p.price) > 40;
 
     return matchCategory && matchSearch && matchPrice;
   });
@@ -1526,8 +1525,8 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                 <p className="text-stone-500 text-sm mb-4 mt-1 flex-grow line-clamp-2 leading-relaxed">{product.description}</p>
                 <div className="flex flex-wrap items-center justify-between mt-auto pt-4 border-t border-stone-100 gap-2">
                   <div className="min-w-0">
-                    <div className="text-xl sm:text-2xl font-black text-gray-900">${parseFloat(product.price).toFixed(2)}</div>
-                    <div className="text-[10px] sm:text-xs text-stone-500 font-medium">Bs. {(product.price * bcvRate).toFixed(2)}</div>
+                    <div className="text-xl sm:text-2xl font-black text-gray-900">${Number(product.price).toFixed(2)}</div>
+                    <div className="text-[10px] sm:text-xs text-stone-500 font-medium">Bs. {(Number(product.price) * bcvRate).toFixed(2)}</div>
                   </div>
                   <div className="flex gap-1.5 sm:gap-2 shrink-0 ml-auto">
                     <button onClick={() => handleQuickBuy(product)} title="Comprar Ahora" className="bg-gray-100 text-gray-600 hover:bg-stone-800 hover:text-white p-2.5 rounded-xl transition-colors shrink-0"><Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-current" /></button>
@@ -1569,7 +1568,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                   )}
                   <div className="flex-1">
                     <h4 className="text-sm font-bold text-gray-800 line-clamp-1">{item.name}</h4>
-                    <p className="text-red-600 font-black text-sm mt-0.5">${parseFloat(item.price).toFixed(2)}</p>
+                    <p className="text-red-600 font-black text-sm mt-0.5">${Number(item.price).toFixed(2)}</p>
                   </div>
                   <div className="flex items-center bg-stone-100 rounded-lg p-1">
                     <button onClick={() => updateQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-white rounded-md transition-all">-</button>
@@ -1589,7 +1588,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                       <div className="bg-stone-50 w-8 h-8 rounded-lg flex items-center justify-center text-lg group-hover:scale-110 transition-transform shrink-0">{extra.emoji || '✨'}</div>
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold text-gray-800 leading-tight truncate">{extra.name}</p>
-                        <p className="text-[10px] text-red-500 font-bold">+${parseFloat(extra.price).toFixed(2)}</p>
+                        <p className="text-[10px] text-red-500 font-bold">+${Number(extra.price).toFixed(2)}</p>
                       </div>
                     </button>
                   ))}
@@ -1636,8 +1635,8 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
               
               <div className="mb-8 p-5 bg-stone-50 rounded-2xl border border-stone-100">
                 <div className="text-sm text-stone-500 font-medium mb-1">Precio</div>
-                <div className="text-4xl font-black text-red-600">${parseFloat(previewProduct.price).toFixed(2)}</div>
-                <div className="text-sm font-bold text-stone-400 mt-1">Equivalente: Bs. {(previewProduct.price * bcvRate).toFixed(2)}</div>
+                <div className="text-4xl font-black text-red-600">${Number(previewProduct.price).toFixed(2)}</div>
+                <div className="text-sm font-bold text-stone-400 mt-1">Equivalente: Bs. {(Number(previewProduct.price) * bcvRate).toFixed(2)}</div>
               </div>
               
               <div className="flex gap-3">
@@ -1715,7 +1714,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                         </select>
                         <input type="number" step="0.01" max={balanceUSD} placeholder={`Monto USD (Deuda: $${balanceUSD.toFixed(2)})`} value={currentPayment.amountUSD} onChange={e=>setCurrentPayment({...currentPayment, amountUSD:e.target.value})} className="w-full px-3 py-3 border border-stone-200 rounded-xl text-sm outline-none"/>
                       </div>
-                      {currentPayment.method === 'Pago Móvil' && currentPayment.amountUSD && <p className="text-[11px] text-blue-600 font-bold bg-blue-50 p-2 rounded-lg">Monto en Bolívares: Bs. {(parseFloat(currentPayment.amountUSD as string) * bcvRate).toFixed(2)}</p>}
+                      {currentPayment.method === 'Pago Móvil' && currentPayment.amountUSD && <p className="text-[11px] text-blue-600 font-bold bg-blue-50 p-2 rounded-lg">Monto en Bolívares: Bs. {(Number(currentPayment.amountUSD) * bcvRate).toFixed(2)}</p>}
                       <button type="button" onClick={handleAddPayment} className="w-full bg-stone-800 hover:bg-black text-white text-sm py-3 rounded-xl font-bold transition-all shadow-md">Registrar este pago</button>
                     </div>
                   )}
