@@ -32,13 +32,6 @@ const VENEZUELAN_BANKS = [
   "Mi Banco", "Banco Caroní", "Banco Exterior"
 ];
 
-const QUICK_EXTRAS = [
-  { id: 'ext_globo', name: 'Globo Metalizado', price: 3.00, emoji: '🎈' },
-  { id: 'ext_nutella', name: 'Extra Nutella', price: 2.00, emoji: '🍫' },
-  { id: 'ext_rosa', name: 'Rosa Individual', price: 1.50, emoji: '🌹' },
-  { id: 'ext_tarjeta', name: 'Tarjeta Premium', price: 2.00, emoji: '💌' }
-];
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -333,7 +326,7 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
                       className="w-full pl-9 pr-8 sm:pl-10 py-1.5 sm:py-2 text-xs sm:text-sm bg-white border border-red-400 rounded-full outline-none focus:ring-2 focus:ring-red-500 shadow-sm transition-all"
                     />
                     <button 
-                      onMouseDown={(e) => e.preventDefault()} // Evita que se pierda el foco y cierre antes de limpiar
+                      onMouseDown={(e) => e.preventDefault()} 
                       onClick={() => { setIsSearchExpanded(false); setSearchQuery(''); }} 
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-red-500 transition-colors"
                     >
@@ -418,7 +411,7 @@ function AdminDashboard({ products, categories, orders, bcvRate }: any) {
               <ShoppingBag className="w-5 h-5" /> Control de Pedidos
             </button>
             <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors font-medium text-sm ${activeTab === 'products' ? 'bg-red-50 text-red-600' : 'text-stone-600 hover:bg-stone-50'}`}>
-              <Tag className="w-5 h-5" /> Catálogo de Productos
+              <Tag className="w-5 h-5" /> Catálogo / Extras
             </button>
             <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors font-medium text-sm ${activeTab === 'categories' ? 'bg-red-50 text-red-600' : 'text-stone-600 hover:bg-stone-50'}`}>
               <List className="w-5 h-5" /> Categorías
@@ -932,7 +925,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                     <div className="flex-1 w-full">
                       <select value={manualProduct} onChange={e => setManualProduct(e.target.value)} className="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs bg-white">
                         <option value="">Selecciona un producto...</option>
-                        {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} - ${p.price}</option>)}
+                        {products.map((p: any) => <option key={p.id} value={p.id}>{p.isExtra ? '🎈 Extra:' : ''} {p.name} - ${p.price}</option>)}
                       </select>
                     </div>
                     <div className="w-full sm:w-20">
@@ -967,7 +960,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
 
 function AdminProducts({ products, categories }: any) {
   const [isEditing, setIsEditing] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState({ id: '', name: '', price: '', image: '', description: '', categoryId: '', badge: '' });
+  const [currentProduct, setCurrentProduct] = useState({ id: '', name: '', price: '', image: '', description: '', categoryId: '', badge: '', isExtra: false, emoji: '' });
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleImageUpload = async (e: any) => {
@@ -1013,10 +1006,12 @@ function AdminProducts({ products, categories }: any) {
     const productData = { 
       name: currentProduct.name,
       price: parseFloat(currentProduct.price),
-      image: currentProduct.image,
-      description: currentProduct.description,
-      categoryId: currentProduct.categoryId,
-      badge: currentProduct.badge || ''
+      image: currentProduct.image || '',
+      description: currentProduct.description || '',
+      categoryId: currentProduct.categoryId || (categories[0]?.id || ''),
+      badge: currentProduct.badge || '',
+      isExtra: currentProduct.isExtra,
+      emoji: currentProduct.emoji || ''
     };
     
     if (currentProduct.id) {
@@ -1028,54 +1023,76 @@ function AdminProducts({ products, categories }: any) {
   };
 
   const handleDelete = async (id: string) => {
-    if(window.confirm('¿Seguro que deseas eliminar este producto?')) await deleteDoc(doc(db, 'products', id));
+    if(window.confirm('¿Seguro que deseas eliminar este producto/extra?')) await deleteDoc(doc(db, 'products', id));
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Catálogo de Productos</h2>
-          <p className="text-stone-500">Añade o edita tus arreglos</p>
+          <h2 className="text-2xl font-bold text-gray-800">Catálogo de Productos y Extras</h2>
+          <p className="text-stone-500">Añade arreglos o extras (globos, rosas, etc)</p>
         </div>
-        <button onClick={() => { setCurrentProduct({ id: '', name: '', price: '', image: '', description: '', categoryId: categories[0]?.id || '', badge: '' }); setIsEditing(true); }}
+        <button onClick={() => { setCurrentProduct({ id: '', name: '', price: '', image: '', description: '', categoryId: categories[0]?.id || '', badge: '', isExtra: false, emoji: '' }); setIsEditing(true); }}
           className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors text-sm"
         >
-          <Plus className="w-4 h-4" /> Nuevo Producto
+          <Plus className="w-4 h-4" /> Nuevo Producto/Extra
         </button>
       </div>
 
       {isEditing && (
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100">
           <form onSubmit={handleSaveProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-              <input required type="text" value={currentProduct.name} onChange={e => setCurrentProduct({...currentProduct, name: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Precio (USD)</label>
-              <input required type="number" step="0.01" value={currentProduct.price} onChange={e => setCurrentProduct({...currentProduct, price: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-              <select required value={currentProduct.categoryId} onChange={e => setCurrentProduct({...currentProduct, categoryId: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
-                {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            
+            {/* TIPO DE PRODUCTO */}
+            <div className="md:col-span-2 bg-stone-50 p-3 rounded-lg border border-stone-200">
+              <label className="block text-sm font-bold text-gray-700 mb-1">Tipo de Artículo</label>
+              <select value={currentProduct.isExtra ? 'true' : 'false'} onChange={e => setCurrentProduct({...currentProduct, isExtra: e.target.value === 'true'})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white font-medium">
+                <option value="false">📦 Producto Normal (Arreglos, Cajas, Desayunos)</option>
+                <option value="true">🎈 Adicional / Extra Especial (Globos, Nutella, Tarjetas)</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Etiqueta (Sticker visual)</label>
-              <select value={currentProduct.badge || ''} onChange={e => setCurrentProduct({...currentProduct, badge: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
-                <option value="">Ninguna</option>
-                <option value="🔥 Más Vendido">🔥 Más Vendido</option>
-                <option value="✨ Nuevo">✨ Nuevo</option>
-                <option value="❤️ Ideal para Aniversario">❤️ Ideal para Aniversario</option>
-                <option value="⭐ Premium">⭐ Premium</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre {currentProduct.isExtra ? 'del Extra' : 'del Arreglo'}</label>
+              <input required type="text" value={currentProduct.name} onChange={e => setCurrentProduct({...currentProduct, name: e.target.value})} placeholder={currentProduct.isExtra ? "Ej: Globo Metalizado" : "Ej: Caja de Fresas M"} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
             </div>
             
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Precio (USD)</label>
+              <input required type="number" step="0.01" value={currentProduct.price} onChange={e => setCurrentProduct({...currentProduct, price: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
+            </div>
+
+            {currentProduct.isExtra ? (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Emoji (Ícono representativo para el carrito)</label>
+                <input required type="text" value={currentProduct.emoji} onChange={e => setCurrentProduct({...currentProduct, emoji: e.target.value})} placeholder="Ej: 🎈, 🍫, 🌹, 💌" className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" />
+                <p className="text-xs text-stone-500 mt-1">Este emoji se mostrará junto al nombre del extra en la sección de ventas cruzadas.</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                  <select required value={currentProduct.categoryId} onChange={e => setCurrentProduct({...currentProduct, categoryId: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
+                    {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Etiqueta (Sticker visual)</label>
+                  <select value={currentProduct.badge || ''} onChange={e => setCurrentProduct({...currentProduct, badge: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
+                    <option value="">Ninguna</option>
+                    <option value="🔥 Más Vendido">🔥 Más Vendido</option>
+                    <option value="✨ Nuevo">✨ Nuevo</option>
+                    <option value="❤️ Ideal para Aniversario">❤️ Ideal para Aniversario</option>
+                    <option value="⭐ Premium">⭐ Premium</option>
+                  </select>
+                </div>
+              </>
+            )}
+            
             <div className="bg-stone-50 p-3 rounded-lg border border-stone-200 md:col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1">Imagen del Producto (Alojamiento Gratuito)</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Imagen (Opcional para Extras)</label>
               
               <div className="mb-2">
                 <label className="bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold py-2 px-4 rounded cursor-pointer transition-colors inline-block">
@@ -1085,17 +1102,20 @@ function AdminProducts({ products, categories }: any) {
                 {uploadProgress > 0 && <span className="text-xs text-blue-600 ml-2 font-bold">Procesando... {Math.round(uploadProgress)}%</span>}
               </div>
 
-              <input required type="url" placeholder="URL generada de ImgBB..." value={currentProduct.image} onChange={e => setCurrentProduct({...currentProduct, image: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white text-stone-500" />
+              <input type="url" required={!currentProduct.isExtra} placeholder="URL generada de ImgBB..." value={currentProduct.image} onChange={e => setCurrentProduct({...currentProduct, image: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white text-stone-500" />
               {currentProduct.image && <img src={currentProduct.image} alt="Preview" className="h-16 mt-2 rounded object-cover" />}
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-              <textarea required value={currentProduct.description} onChange={e => setCurrentProduct({...currentProduct, description: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" rows={2} />
-            </div>
+            {!currentProduct.isExtra && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <textarea required value={currentProduct.description} onChange={e => setCurrentProduct({...currentProduct, description: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm" rows={2} />
+              </div>
+            )}
+            
             <div className="md:col-span-2 flex justify-end gap-3 mt-2">
               <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-              <button type="submit" className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg">Guardar Producto</button>
+              <button type="submit" className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg">Guardar Elemento</button>
             </div>
           </form>
         </div>
@@ -1105,7 +1125,7 @@ function AdminProducts({ products, categories }: any) {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-stone-50 text-stone-600 text-sm border-b border-stone-100">
-              <th className="p-4 font-medium">Producto</th>
+              <th className="p-4 font-medium">Producto / Extra</th>
               <th className="p-4 font-medium">Precio</th>
               <th className="p-4 font-medium text-right">Acciones</th>
             </tr>
@@ -1114,10 +1134,18 @@ function AdminProducts({ products, categories }: any) {
             {products.map((product: any) => (
               <tr key={product.id}>
                 <td className="p-4 flex items-center gap-3">
-                  <img src={product.image} alt={product.name} className="w-10 h-10 rounded-lg object-cover bg-stone-200 shrink-0" />
+                  {product.isExtra ? (
+                    <div className="w-10 h-10 rounded-lg bg-stone-100 flex items-center justify-center text-xl shrink-0 border border-stone-200">{product.emoji || '✨'}</div>
+                  ) : (
+                    <img src={product.image} alt={product.name} className="w-10 h-10 rounded-lg object-cover bg-stone-200 shrink-0" />
+                  )}
                   <div>
                     <span className="font-medium text-gray-800 text-sm block">{product.name}</span>
-                    {product.badge && <span className="text-[10px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.5 rounded">{product.badge}</span>}
+                    {product.isExtra ? (
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">Adicional</span>
+                    ) : (
+                      product.badge && <span className="text-[10px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.5 rounded">{product.badge}</span>
+                    )}
                   </div>
                 </td>
                 <td className="p-4 text-sm font-semibold text-gray-800">${parseFloat(product.price).toFixed(2)}</td>
@@ -1262,7 +1290,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     
     text += `*📦 PRODUCTOS:*\n`;
     cart.forEach((item: any) => { 
-      text += `▪️ ${item.quantity}x ${item.name} ($${parseFloat(item.price).toFixed(2)})\n`; 
+      text += `▪️ ${item.quantity}x ${item.isExtra && item.emoji ? item.emoji : ''} ${item.name} ($${parseFloat(item.price).toFixed(2)})\n`; 
     });
     
     text += `\n*💰 TOTAL:* $${totalUSD.toFixed(2)} (Bs. ${(totalUSD * bcvRate).toFixed(2)})\n`;
@@ -1282,7 +1310,11 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     setCart([]); setClientPayments([]); setCheckoutStep(false);
   };
 
-  const filteredProducts = products.filter((p: any) => {
+  // SEPARACIÓN DE PRODUCTOS NORMALES Y EXTRAS
+  const mainProducts = products.filter((p: any) => !p.isExtra);
+  const extraProducts = products.filter((p: any) => p.isExtra);
+
+  const filteredProducts = mainProducts.filter((p: any) => {
     const matchCategory = selectedCategory === 'all' || p.categoryId === selectedCategory;
     const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -1423,9 +1455,13 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
             ) : (
               cart.map((item: any) => (
                 <div key={item.id} className="flex gap-4 items-center mb-5 bg-white p-3 rounded-2xl shadow-sm border border-stone-100">
-                  <img src={item.image || 'https://via.placeholder.com/150'} className="w-16 h-16 rounded-xl object-cover bg-stone-100 text-[8px] text-center" alt={item.emoji || item.name} />
+                  {item.isExtra ? (
+                    <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center text-3xl shrink-0">{item.emoji || '✨'}</div>
+                  ) : (
+                    <img src={item.image || 'https://via.placeholder.com/150'} className="w-16 h-16 rounded-xl object-cover bg-stone-100 text-[8px] text-center" alt={item.name} />
+                  )}
                   <div className="flex-1">
-                    <h4 className="text-sm font-bold text-gray-800 line-clamp-1">{item.emoji ? `${item.emoji} ${item.name}` : item.name}</h4>
+                    <h4 className="text-sm font-bold text-gray-800 line-clamp-1">{item.name}</h4>
                     <p className="text-red-600 font-black text-sm mt-0.5">${parseFloat(item.price).toFixed(2)}</p>
                   </div>
                   <div className="flex items-center bg-stone-100 rounded-lg p-1">
@@ -1437,17 +1473,17 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
               ))
             )}
 
-            {/* SECCIÓN DE EXTRAS / UPSELL */}
-            {cart.length > 0 && (
+            {/* SECCIÓN DE EXTRAS / UPSELL DINÁMICA */}
+            {cart.length > 0 && extraProducts.length > 0 && (
               <div className="mt-8">
                 <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Star className="w-3 h-3"/> Agrega un Extra Especial</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {QUICK_EXTRAS.map(extra => (
+                  {extraProducts.map((extra: any) => (
                     <button key={extra.id} onClick={() => addToCart(extra)} className="bg-white border border-stone-200 hover:border-pink-300 p-2 rounded-xl flex items-center gap-2 text-left transition-all hover:shadow-sm group">
-                      <div className="bg-stone-50 w-8 h-8 rounded-lg flex items-center justify-center text-lg group-hover:scale-110 transition-transform">{extra.emoji}</div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-800 leading-tight">{extra.name}</p>
-                        <p className="text-[10px] text-red-500 font-bold">+${extra.price.toFixed(2)}</p>
+                      <div className="bg-stone-50 w-8 h-8 rounded-lg flex items-center justify-center text-lg group-hover:scale-110 transition-transform shrink-0">{extra.emoji || '✨'}</div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold text-gray-800 leading-tight truncate">{extra.name}</p>
+                        <p className="text-[10px] text-red-500 font-bold">+${parseFloat(extra.price).toFixed(2)}</p>
                       </div>
                     </button>
                   ))}
