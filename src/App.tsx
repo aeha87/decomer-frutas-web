@@ -5,7 +5,7 @@ import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot
 import { 
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook, Image as ImageIcon,
   CheckCircle, Menu, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, Filter, MessageSquare, Send, Video, Printer,
-  Search, MessageCircle, Heart, Clock
+  Search, MessageCircle, Heart, Clock, Zap, Star, Gift, Truck, MousePointer2, Eye
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -32,6 +32,13 @@ const VENEZUELAN_BANKS = [
   "Mi Banco", "Banco Caroní", "Banco Exterior"
 ];
 
+const QUICK_EXTRAS = [
+  { id: 'ext_globo', name: 'Globo Metalizado', price: 3.00, emoji: '🎈' },
+  { id: 'ext_nutella', name: 'Extra Nutella', price: 2.00, emoji: '🍫' },
+  { id: 'ext_rosa', name: 'Rosa Individual', price: 1.50, emoji: '🌹' },
+  { id: 'ext_tarjeta', name: 'Tarjeta Premium', price: 2.00, emoji: '💌' }
+];
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -50,7 +57,6 @@ export default function App() {
       if (docSnap.exists() && docSnap.data().rate) {
         setBcvRate(docSnap.data().rate);
       } else {
-        // Si no existe en Firebase aún, busca la automática y la guarda
         const fetchBcv = async () => {
           try {
             const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv');
@@ -61,7 +67,7 @@ export default function App() {
               setDoc(doc(db, 'settings', 'bcv'), { rate: fetchedRate }, { merge: true });
             }
           } catch (e) {
-            console.log("No se pudo conectar al servidor del BCV. Usando tasa de respaldo.");
+            console.log("No se pudo conectar al servidor del BCV.");
           }
         };
         fetchBcv();
@@ -117,7 +123,6 @@ export default function App() {
     setCart([]);
   };
 
-  // FUNCIÓN PARA GUARDAR LA TASA EN FIREBASE
   const handleSaveBcvRate = async (newRate: number) => {
     if (!newRate || isNaN(newRate)) return;
     try {
@@ -254,7 +259,6 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
         </div>
         
         <div className="flex items-center gap-2 sm:gap-6">
-          {/* TASA BCV SIEMPRE VISIBLE Y ADAPTABLE */}
           <div className="flex items-center gap-1 sm:gap-2 bg-green-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-green-200 shadow-inner">
             <Activity className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
             <span className="hidden sm:inline text-xs font-bold text-green-800">Tasa BCV:</span>
@@ -317,19 +321,16 @@ function Footer() {
         </div>
         
         <div className="flex flex-wrap justify-center gap-4 mt-2">
-          {/* INSTAGRAM */}
           <a href="https://www.instagram.com/decomerfrutas/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-pink-400 hover:text-pink-300 transition-transform hover:scale-110 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg">
             <Instagram className="w-5 h-5" />
             <span className="font-medium text-sm">Instagram</span>
           </a>
           
-          {/* FACEBOOK */}
           <a href="https://www.facebook.com/DecomerFrutasMCBO" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-transform hover:scale-110 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg">
             <Facebook className="w-5 h-5" />
             <span className="font-medium text-sm">Facebook</span>
           </a>
 
-          {/* TIKTOK */}
           <a href="https://www.tiktok.com/@decomer.frutas" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-white hover:text-gray-200 transition-transform hover:scale-110 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg">
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
@@ -342,6 +343,7 @@ function Footer() {
   );
 }
 
+// ... ADMIN COMPONENTS REUSADOS ...
 function AdminDashboard({ products, categories, orders, bcvRate }: any) {
   const [activeTab, setActiveTab] = useState('orders');
 
@@ -363,13 +365,6 @@ function AdminDashboard({ products, categories, orders, bcvRate }: any) {
             <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors font-medium text-sm ${activeTab === 'categories' ? 'bg-red-50 text-red-600' : 'text-stone-600 hover:bg-stone-50'}`}>
               <List className="w-5 h-5" /> Categorías
             </button>
-            <div className="pt-4 mt-2 border-t border-stone-100">
-              <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2 px-3">Atención al Cliente</h3>
-              <button onClick={() => setActiveTab('messages')} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors font-medium text-sm ${activeTab === 'messages' ? 'bg-red-50 text-red-600' : 'text-stone-600 hover:bg-stone-50'}`}>
-                <div className="flex items-center gap-3"><MessageSquare className="w-5 h-5" /> Mensajería</div>
-                <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>
-              </button>
-            </div>
           </nav>
         </div>
       </div>
@@ -379,7 +374,6 @@ function AdminDashboard({ products, categories, orders, bcvRate }: any) {
         {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
         {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
         {activeTab === 'categories' && <AdminCategories categories={categories} />}
-        {activeTab === 'messages' && <AdminMessages />}
       </div>
     </div>
   );
@@ -660,7 +654,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
               </div>
 
               <div className="border-t border-b border-dashed border-stone-300 py-4 mb-4 space-y-2">
-                <p className="text-[13px] text-gray-800"><strong className="text-gray-500">Fecha:</strong> {new Date(receiptModal.order.date).toLocaleString()}</p>
+                <p className="text-[13px] text-gray-800"><strong className="text-gray-500">Fecha Creado:</strong> {new Date(receiptModal.order.date).toLocaleString()}</p>
                 <div className="grid grid-cols-2 gap-2 border-b border-stone-100 pb-2">
                   <div>
                     <p className="text-[11px] font-bold text-stone-400 uppercase">Enviado por:</p>
@@ -674,7 +668,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                   </div>
                 </div>
                 <p className="text-sm text-gray-800"><strong className="text-gray-500">Dirección:</strong> {receiptModal.order.deliveryAddress || receiptModal.order.address}</p>
-                <p className="text-sm text-gray-800"><strong className="text-gray-500">Horario:</strong> {receiptModal.order.deliveryTime || 'Por acordar'}</p>
+                <p className="text-sm text-gray-800"><strong className="text-gray-500">Fecha/Hora:</strong> {receiptModal.order.deliveryDate} - {receiptModal.order.deliveryTimeSlot}</p>
               </div>
 
               {receiptModal.order.dedication && (
@@ -725,7 +719,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
         </div>
       )}
 
-      {/* MODAL DE PAGOS (IGUAL AL ANTERIOR) */}
+      {/* MODALES DE PAGOS Y MANUALES... */}
       {paymentModal.isOpen && orders.find((o: any) => o.id === paymentModal.orderId) && (() => {
         const activeOrder = orders.find((o: any) => o.id === paymentModal.orderId);
         const totalPaid = (activeOrder.payments || []).reduce((sum: number, p: any) => sum + p.amountUSD, 0);
@@ -915,7 +909,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
 
 function AdminProducts({ products, categories }: any) {
   const [isEditing, setIsEditing] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState({ id: '', name: '', price: '', image: '', description: '', categoryId: '' });
+  const [currentProduct, setCurrentProduct] = useState({ id: '', name: '', price: '', image: '', description: '', categoryId: '', badge: '' });
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleImageUpload = async (e: any) => {
@@ -963,7 +957,8 @@ function AdminProducts({ products, categories }: any) {
       price: parseFloat(currentProduct.price),
       image: currentProduct.image,
       description: currentProduct.description,
-      categoryId: currentProduct.categoryId
+      categoryId: currentProduct.categoryId,
+      badge: currentProduct.badge || ''
     };
     
     if (currentProduct.id) {
@@ -985,7 +980,7 @@ function AdminProducts({ products, categories }: any) {
           <h2 className="text-2xl font-bold text-gray-800">Catálogo de Productos</h2>
           <p className="text-stone-500">Añade o edita tus arreglos</p>
         </div>
-        <button onClick={() => { setCurrentProduct({ id: '', name: '', price: '', image: '', description: '', categoryId: categories[0]?.id || '' }); setIsEditing(true); }}
+        <button onClick={() => { setCurrentProduct({ id: '', name: '', price: '', image: '', description: '', categoryId: categories[0]?.id || '', badge: '' }); setIsEditing(true); }}
           className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors text-sm"
         >
           <Plus className="w-4 h-4" /> Nuevo Producto
@@ -1009,8 +1004,20 @@ function AdminProducts({ products, categories }: any) {
                 {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+
+            {/* NUEVO: SELECTOR DE ETIQUETA PROMOCIONAL */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Etiqueta (Sticker visual)</label>
+              <select value={currentProduct.badge || ''} onChange={e => setCurrentProduct({...currentProduct, badge: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
+                <option value="">Ninguna</option>
+                <option value="🔥 Más Vendido">🔥 Más Vendido</option>
+                <option value="✨ Nuevo">✨ Nuevo</option>
+                <option value="❤️ Ideal para Aniversario">❤️ Ideal para Aniversario</option>
+                <option value="⭐ Premium">⭐ Premium</option>
+              </select>
+            </div>
             
-            <div className="bg-stone-50 p-3 rounded-lg border border-stone-200">
+            <div className="bg-stone-50 p-3 rounded-lg border border-stone-200 md:col-span-2">
               <label className="block text-sm font-bold text-gray-700 mb-1">Imagen del Producto (Alojamiento Gratuito)</label>
               
               <div className="mb-2">
@@ -1051,7 +1058,10 @@ function AdminProducts({ products, categories }: any) {
               <tr key={product.id}>
                 <td className="p-4 flex items-center gap-3">
                   <img src={product.image} alt={product.name} className="w-10 h-10 rounded-lg object-cover bg-stone-200 shrink-0" />
-                  <span className="font-medium text-gray-800 text-sm">{product.name}</span>
+                  <div>
+                    <span className="font-medium text-gray-800 text-sm block">{product.name}</span>
+                    {product.badge && <span className="text-[10px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.5 rounded">{product.badge}</span>}
+                  </div>
                 </td>
                 <td className="p-4 text-sm font-semibold text-gray-800">${parseFloat(product.price).toFixed(2)}</td>
                 <td className="p-4 text-right">
@@ -1103,22 +1113,15 @@ function AdminCategories({ categories }: any) {
   );
 }
 
-function AdminMessages() {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 h-[calc(100vh-10rem)] min-h-[500px] flex items-center justify-center text-stone-400">
-      <div className="text-center">
-        <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-20" />
-        <p>El módulo de mensajería omnicanal estará activo tras conectar las APIs de Meta.</p>
-      </div>
-    </div>
-  );
-}
-
 function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }: any) {
   const [checkoutStep, setCheckoutStep] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [priceFilter, setPriceFilter] = useState('all'); // NUEVO FILTRO PRECIO
   const [searchQuery, setSearchQuery] = useState('');
   const [showToast, setShowToast] = useState(false);
+  
+  // NUEVO MODAL DE VISTA PREVIA
+  const [previewProduct, setPreviewProduct] = useState<any>(null);
   
   const [deliveryInfo, setDeliveryInfo] = useState({ 
     senderName: user?.name || '', 
@@ -1126,7 +1129,8 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
     recipientName: '', 
     recipientPhone: '', 
     deliveryAddress: user?.address || '', 
-    deliveryTime: '',
+    deliveryDate: '', // NUEVO CAMPO FECHA
+    deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', // NUEVO SELECTOR HORARIO
     dedication: '' 
   });
 
@@ -1140,7 +1144,16 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
     
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
+    setPreviewProduct(null); // Cierra modal si estaba abierto
   };
+
+  const handleQuickBuy = (product: any) => {
+    addToCart(product);
+    setTimeout(() => {
+      setCheckoutStep(true);
+      window.scrollTo(0, 0);
+    }, 100);
+  }
 
   const updateQuantity = (id: string, delta: number) => setCart(cart.map((item: any) => item.id === id ? { ...item, quantity: item.quantity + delta } : item).filter((item: any) => item.quantity > 0));
   
@@ -1166,7 +1179,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
     const phone = "584125296272";
     const orderDisplayId = `PED-${Math.floor(Math.random() * 10000)}`;
     
-    // GUARDAR EN FIREBASE CON NUEVOS CAMPOS
+    // GUARDAR EN FIREBASE CON NUEVOS CAMPOS DE FECHA Y HORA
     await addDoc(collection(db, 'orders'), {
       displayId: orderDisplayId,
       ...deliveryInfo,
@@ -1179,15 +1192,16 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
 
     // GENERAR MENSAJE DE WHATSAPP MEJORADO
     let text = `*¡Hola Decomer Frutas! Nuevo Pedido Web* 🍓🍫\n\n*Orden:* #${orderDisplayId}\n\n`;
-    text += `*📤 DATOS DE QUIEN ENVÍA:*\n`;
+    text += `*📤 QUIEN ENVÍA:*\n`;
     text += `▪️ Nombre: ${deliveryInfo.senderName}\n`;
     text += `▪️ Teléfono: ${deliveryInfo.senderPhone}\n\n`;
-    text += `*📥 DATOS DE QUIEN RECIBE:*\n`;
+    text += `*📥 QUIEN RECIBE:*\n`;
     text += `▪️ Nombre: ${deliveryInfo.recipientName}\n`;
     text += `▪️ Teléfono: ${deliveryInfo.recipientPhone}\n\n`;
     text += `*📍 DETALLES DE ENTREGA:*\n`;
     text += `▪️ Dirección: ${deliveryInfo.deliveryAddress}\n`;
-    text += `▪️ Horario: ${deliveryInfo.deliveryTime}\n\n`;
+    text += `▪️ Fecha: ${deliveryInfo.deliveryDate}\n`;
+    text += `▪️ Horario: ${deliveryInfo.deliveryTimeSlot}\n\n`;
     
     if(deliveryInfo.dedication) {
       text += `*📝 DEDICATORIA:*\n_"${deliveryInfo.dedication}"_\n\n`;
@@ -1218,7 +1232,14 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
   const filteredProducts = products.filter((p: any) => {
     const matchCategory = selectedCategory === 'all' || p.categoryId === selectedCategory;
     const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCategory && matchSearch;
+    
+    // FILTRO PRECIO LOGIC
+    let matchPrice = true;
+    if (priceFilter === 'under20') matchPrice = parseFloat(p.price) < 20;
+    if (priceFilter === '20to40') matchPrice = parseFloat(p.price) >= 20 && parseFloat(p.price) <= 40;
+    if (priceFilter === 'premium') matchPrice = parseFloat(p.price) > 40;
+
+    return matchCategory && matchSearch && matchPrice;
   });
 
   return (
@@ -1237,7 +1258,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
 
       <div className="flex-1">
         {/* HERO BANNER */}
-        <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-3xl p-8 sm:p-10 text-white mb-8 shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-3xl p-8 sm:p-10 text-white mb-6 shadow-lg relative overflow-hidden">
           <div className="relative z-10">
             <h1 className="text-3xl sm:text-5xl font-black mb-3 font-serif drop-shadow-md">Regala dulzura y amor</h1>
             <p className="text-red-50 text-base sm:text-lg max-w-lg leading-relaxed font-medium">Descubre nuestros hermosos arreglos frutales y fresas con chocolate. 🍓🍫</p>
@@ -1245,42 +1266,96 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
           <Heart className="absolute -right-10 -bottom-10 w-64 h-64 text-white opacity-10 transform -rotate-12" />
         </div>
 
+        {/* CÓMO FUNCIONA */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white p-4 rounded-2xl flex items-center gap-4 shadow-sm border border-stone-100">
+            <div className="bg-red-50 text-red-500 p-3 rounded-xl"><MousePointer2 className="w-6 h-6"/></div>
+            <div><p className="text-sm font-bold text-gray-800">1. Eliges tu regalo</p><p className="text-xs text-stone-500">Añade al carrito</p></div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl flex items-center gap-4 shadow-sm border border-stone-100">
+            <div className="bg-pink-50 text-pink-500 p-3 rounded-xl"><Gift className="w-6 h-6"/></div>
+            <div><p className="text-sm font-bold text-gray-800">2. Lo preparamos</p><p className="text-xs text-stone-500">Con frutas frescas</p></div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl flex items-center gap-4 shadow-sm border border-stone-100">
+            <div className="bg-green-50 text-green-500 p-3 rounded-xl"><Truck className="w-6 h-6"/></div>
+            <div><p className="text-sm font-bold text-gray-800">3. ¡Entregamos!</p><p className="text-xs text-stone-500">Sorpresa garantizada</p></div>
+          </div>
+        </div>
+
         {/* FILTROS Y BÚSQUEDA */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full md:w-auto flex-1">
-            <button onClick={() => setSelectedCategory('all')} className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${selectedCategory === 'all' ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>Todos</button>
-            {categories.map((cat: any) => (
-              <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm whitespace-nowrap ${selectedCategory === cat.id ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>{cat.name}</button>
-            ))}
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto flex-1">
+            {/* Categorías */}
+            <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full sm:w-auto">
+              <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${selectedCategory === 'all' ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>Todos</button>
+              {categories.map((cat: any) => (
+                <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap ${selectedCategory === cat.id ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>{cat.name}</button>
+              ))}
+            </div>
+            
+            {/* Filtros de Precio */}
+            <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar border-l-0 sm:border-l-2 sm:pl-3 border-stone-200">
+              <button onClick={() => setPriceFilter('all')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceFilter === 'all' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Cualquier Precio</button>
+              <button onClick={() => setPriceFilter('under20')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${priceFilter === 'under20' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Menos de $20</button>
+              <button onClick={() => setPriceFilter('20to40')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${priceFilter === '20to40' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>$20 - $40</button>
+              <button onClick={() => setPriceFilter('premium')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${priceFilter === 'premium' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Premium</button>
+            </div>
           </div>
-          <div className="relative w-full md:w-72 shrink-0">
-            <Search className="w-5 h-5 absolute left-4 top-3 text-stone-400" />
-            <input type="text" placeholder="Buscar arreglos..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-2.5 bg-white border border-stone-200 rounded-full text-sm outline-none focus:ring-2 focus:ring-red-500 shadow-sm" />
+          
+          <div className="relative w-full md:w-64 shrink-0">
+            <Search className="w-5 h-5 absolute left-4 top-2.5 text-stone-400" />
+            <input type="text" placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 shadow-sm" />
           </div>
         </div>
 
         {/* GRILLA DE PRODUCTOS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProducts.map((product: any) => (
-            <div key={product.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl border border-stone-100 overflow-hidden flex flex-col group transition-all duration-300">
-              <div className="h-56 bg-stone-100 overflow-hidden relative">
-                <img src={product.image} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" alt={product.name} />
+            <div key={product.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl border border-stone-100 overflow-hidden flex flex-col group transition-all duration-300 relative">
+              {/* ETIQUETA PROMOCIONAL (BADGE) */}
+              {product.badge && (
+                <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg border border-yellow-100">
+                  <span className="text-xs font-black text-gray-800">{product.badge}</span>
+                </div>
+              )}
+              
+              <div 
+                className="h-56 bg-stone-100 overflow-hidden relative cursor-pointer"
+                onClick={() => setPreviewProduct(product)}
+              >
+                <img src={product.image} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" alt={product.name} />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 bg-white/90 text-stone-800 text-xs font-bold px-3 py-2 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center gap-1"><Eye className="w-4 h-4"/> Ver Detalle</span>
+                </div>
               </div>
+              
               <div className="p-5 flex flex-col flex-grow">
-                <h3 className="text-lg font-bold text-gray-800">{product.name}</h3>
+                <h3 className="text-lg font-bold text-gray-800 line-clamp-1">{product.name}</h3>
                 <p className="text-stone-500 text-sm mb-4 mt-1 flex-grow line-clamp-2 leading-relaxed">{product.description}</p>
                 <div className="flex items-end justify-between mt-auto pt-4 border-t border-stone-100">
                   <div>
                     <div className="text-2xl font-black text-gray-900">${parseFloat(product.price).toFixed(2)}</div>
                     <div className="text-xs text-stone-500 font-medium">Bs. {(product.price * bcvRate).toFixed(2)}</div>
                   </div>
-                  <button onClick={() => addToCart(product)} className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white p-3.5 rounded-xl transition-colors">
-                    <Plus className="w-5 h-5 font-bold" />
-                  </button>
+                  <div className="flex gap-2">
+                    {/* BOTÓN COMPRA RÁPIDA */}
+                    <button onClick={() => handleQuickBuy(product)} title="Comprar Ahora" className="bg-gray-100 text-gray-600 hover:bg-stone-800 hover:text-white p-3 rounded-xl transition-colors">
+                      <Zap className="w-5 h-5 fill-current" />
+                    </button>
+                    <button onClick={() => addToCart(product)} title="Añadir al carrito" className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white p-3 rounded-xl transition-colors">
+                      <Plus className="w-5 h-5 font-bold" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           ))}
+          {filteredProducts.length === 0 && (
+             <div className="col-span-full py-20 text-center text-stone-500">
+               <Package className="w-16 h-16 mx-auto mb-4 opacity-20" />
+               <p className="font-medium">No encontramos arreglos con esos filtros.</p>
+             </div>
+          )}
         </div>
       </div>
 
@@ -1291,6 +1366,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
             <h3 className="text-lg font-bold flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Mi Pedido</h3>
             <span className="bg-stone-800 text-stone-300 text-xs font-bold px-2 py-1 rounded-md">{cart.reduce((a,c)=>a+c.quantity,0)} items</span>
           </div>
+          
           <div className="p-6 flex-grow overflow-y-auto bg-stone-50/50">
             {cart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-stone-400 py-10 opacity-70">
@@ -1300,9 +1376,9 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
             ) : (
               cart.map((item: any) => (
                 <div key={item.id} className="flex gap-4 items-center mb-5 bg-white p-3 rounded-2xl shadow-sm border border-stone-100">
-                  <img src={item.image} className="w-16 h-16 rounded-xl object-cover" />
+                  <img src={item.image || 'https://via.placeholder.com/150'} className="w-16 h-16 rounded-xl object-cover bg-stone-100 text-[8px] text-center" alt={item.emoji || item.name} />
                   <div className="flex-1">
-                    <h4 className="text-sm font-bold text-gray-800">{item.name}</h4>
+                    <h4 className="text-sm font-bold text-gray-800 line-clamp-1">{item.emoji ? `${item.emoji} ${item.name}` : item.name}</h4>
                     <p className="text-red-600 font-black text-sm mt-0.5">${parseFloat(item.price).toFixed(2)}</p>
                   </div>
                   <div className="flex items-center bg-stone-100 rounded-lg p-1">
@@ -1313,7 +1389,26 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
                 </div>
               ))
             )}
+
+            {/* SECCIÓN DE EXTRAS / UPSELL */}
+            {cart.length > 0 && (
+              <div className="mt-8">
+                <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Star className="w-3 h-3"/> Agrega un Extra Especial</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {QUICK_EXTRAS.map(extra => (
+                    <button key={extra.id} onClick={() => addToCart(extra)} className="bg-white border border-stone-200 hover:border-pink-300 p-2 rounded-xl flex items-center gap-2 text-left transition-all hover:shadow-sm group">
+                      <div className="bg-stone-50 w-8 h-8 rounded-lg flex items-center justify-center text-lg group-hover:scale-110 transition-transform">{extra.emoji}</div>
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-800 leading-tight">{extra.name}</p>
+                        <p className="text-[10px] text-red-500 font-bold">+${extra.price.toFixed(2)}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
           {cart.length > 0 && (
             <div className="p-6 bg-white border-t border-stone-100">
               <div className="flex justify-between items-end mb-4">
@@ -1331,7 +1426,43 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
         </div>
       </div>
 
-      {/* PASARELA DE PAGO / FORMULARIO MEJORADO */}
+      {/* MODAL VISTA PREVIA PRODUCTO */}
+      {previewProduct && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row shadow-2xl relative">
+            <button onClick={() => setPreviewProduct(null)} className="absolute top-4 right-4 z-10 bg-white/50 backdrop-blur hover:bg-white p-2 rounded-full text-stone-800 transition-colors"><X className="w-5 h-5"/></button>
+            
+            <div className="w-full md:w-1/2 h-64 md:h-auto bg-stone-100 relative">
+              <img src={previewProduct.image} className="w-full h-full object-cover" alt={previewProduct.name} />
+              {previewProduct.badge && (
+                <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-yellow-100">
+                  <span className="text-sm font-black text-gray-800">{previewProduct.badge}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
+              <div className="mb-2 text-xs font-bold text-red-500 uppercase tracking-widest">{categories.find(c=>c.id === previewProduct.categoryId)?.name || 'Arreglo Especial'}</div>
+              <h2 className="text-3xl font-black text-gray-900 mb-4 leading-tight">{previewProduct.name}</h2>
+              <p className="text-stone-500 text-base mb-8 leading-relaxed whitespace-pre-wrap">{previewProduct.description}</p>
+              
+              <div className="mb-8 p-5 bg-stone-50 rounded-2xl border border-stone-100">
+                <div className="text-sm text-stone-500 font-medium mb-1">Precio</div>
+                <div className="text-4xl font-black text-red-600">${parseFloat(previewProduct.price).toFixed(2)}</div>
+                <div className="text-sm font-bold text-stone-400 mt-1">Equivalente: Bs. {(previewProduct.price * bcvRate).toFixed(2)}</div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button onClick={() => addToCart(previewProduct)} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-lg shadow-xl shadow-red-200 transition-transform hover:-translate-y-1">
+                  <ShoppingCart className="w-5 h-5" /> Agregar al Pedido
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PASARELA DE PAGO / FORMULARIO (AHORA CON FECHA/HORA) */}
       {checkoutStep && (
         <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-scale-in">
@@ -1348,7 +1479,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
                 
                 {/* SECCIÓN REMITENTE */}
                 <div className="space-y-4">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><User className="w-4 h-4"/> 1. Datos de quien envía (Remitente)</h4>
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><User className="w-4 h-4"/> 1. Datos de quien envía (Tú)</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <input required type="text" placeholder="Nombre completo" value={deliveryInfo.senderName} onChange={e=>setDeliveryInfo({...deliveryInfo, senderName:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500"/>
                     <input required type="tel" placeholder="Teléfono" value={deliveryInfo.senderPhone} onChange={e=>setDeliveryInfo({...deliveryInfo, senderPhone:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500"/>
@@ -1357,21 +1488,32 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
 
                 {/* SECCIÓN DESTINATARIO */}
                 <div className="space-y-4">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><Heart className="w-4 h-4"/> 2. Datos de quien recibe (Destinatario)</h4>
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><Heart className="w-4 h-4"/> 2. Datos de quien recibe la Sorpresa</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <input required type="text" placeholder="Nombre de quien recibe" value={deliveryInfo.recipientName} onChange={e=>setDeliveryInfo({...deliveryInfo, recipientName:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500"/>
                     <input required type="tel" placeholder="Teléfono del destinatario" value={deliveryInfo.recipientPhone} onChange={e=>setDeliveryInfo({...deliveryInfo, recipientPhone:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500"/>
                   </div>
                 </div>
 
-                {/* SECCIÓN LOGÍSTICA */}
+                {/* SECCIÓN LOGÍSTICA (NUEVO CALENDARIO Y SELECTOR) */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
                   <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={deliveryInfo.deliveryAddress} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryAddress:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 resize-none"/>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-3.5 w-4 h-4 text-stone-400" />
-                    <input required type="text" placeholder="Horario de entrega (Ej: 9:30 AM - 10:30 AM)" value={deliveryInfo.deliveryTime} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryTime:e.target.value})} className="w-full pl-10 pr-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500"/>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Fecha de Entrega</label>
+                      <input required type="date" value={deliveryInfo.deliveryDate} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryDate:e.target.value})} min={new Date().toISOString().split('T')[0]} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 text-stone-700"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Bloque Horario</label>
+                      <select required value={deliveryInfo.deliveryTimeSlot} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryTimeSlot:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 text-stone-700 bg-white">
+                        <option value="Mañana (8:00 AM - 12:00 PM)">☀️ Mañana (8am - 12pm)</option>
+                        <option value="Tarde (1:00 PM - 5:00 PM)">🌤️ Tarde (1pm - 5pm)</option>
+                      </select>
+                    </div>
                   </div>
+
                   <textarea placeholder="Dedicatoria (Escribe el mensaje que llevará tu tarjeta)" rows={2} value={deliveryInfo.dedication} onChange={e=>setDeliveryInfo({...deliveryInfo, dedication:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 resize-none bg-red-50/50 italic"/>
                 </div>
 
