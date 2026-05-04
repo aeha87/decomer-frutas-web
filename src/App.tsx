@@ -49,6 +49,10 @@ export default function App() {
   const [bcvRate, setBcvRate] = useState(36.50);
   const [cart, setCart] = useState<any[]>([]);
   
+  // ESTADOS DE BÚSQUEDA GLOBALES (Para compartirlos entre Navbar y Storefront)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+
   const [view, setView] = useState('app');
 
   useEffect(() => {
@@ -142,12 +146,32 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col font-sans overflow-x-hidden">
-      <Navbar user={currentUser} onLogout={handleLogout} cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} bcvRate={bcvRate} setBcvRate={setBcvRate} onSaveBcv={handleSaveBcvRate} onLoginClick={() => setView('login')} />
+      <Navbar 
+        user={currentUser} 
+        onLogout={handleLogout} 
+        cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} 
+        bcvRate={bcvRate} 
+        setBcvRate={setBcvRate} 
+        onSaveBcv={handleSaveBcvRate} 
+        onLoginClick={() => setView('login')} 
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        isSearchExpanded={isSearchExpanded}
+        setIsSearchExpanded={setIsSearchExpanded}
+      />
       <main className="flex-grow container mx-auto px-4 py-8 relative">
         {currentUser?.role === 'admin' ? (
           <AdminDashboard products={products} categories={categories} orders={orders} bcvRate={bcvRate} />
         ) : (
-          <ClientStorefront products={products} categories={categories} cart={cart} setCart={setCart} user={currentUser} bcvRate={bcvRate} />
+          <ClientStorefront 
+            products={products} 
+            categories={categories} 
+            cart={cart} 
+            setCart={setCart} 
+            user={currentUser} 
+            bcvRate={bcvRate}
+            searchQuery={searchQuery}
+          />
         )}
       </main>
       <Footer />
@@ -250,7 +274,7 @@ function AuthScreen({ view, setView }: any) {
   );
 }
 
-function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onLoginClick }: any) {
+function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onLoginClick, searchQuery, setSearchQuery, isSearchExpanded, setIsSearchExpanded }: any) {
   return (
     <nav className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 print:hidden transition-all">
       <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex justify-between items-center">
@@ -258,8 +282,10 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
           <img src="/logo.png" alt="Decomer Frutas" className="h-10 sm:h-14 w-auto drop-shadow-sm hover:scale-105 transition-transform" />
         </div>
         
-        <div className="flex items-center gap-2 sm:gap-6">
-          <div className="flex items-center gap-1 sm:gap-2 bg-green-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-green-200 shadow-inner">
+        <div className="flex items-center gap-1 sm:gap-4">
+          
+          {/* TASA BCV - Se oculta en móviles si la búsqueda está expandida para dar espacio */}
+          <div className={`items-center gap-1 sm:gap-2 bg-green-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-green-200 shadow-inner transition-opacity ${user?.role !== 'admin' && isSearchExpanded ? 'hidden sm:flex' : 'flex'}`}>
             <Activity className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
             <span className="hidden sm:inline text-xs font-bold text-green-800">Tasa BCV:</span>
             <span className="sm:hidden text-[10px] font-bold text-green-800">BCV:</span>
@@ -290,7 +316,38 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
               </button>
             </>
           ) : (
-            <>
+            <div className="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-0">
+              
+              {/* LUPA DE BÚSQUEDA INTEGRADA EN NAVBAR */}
+              <div className={`relative flex items-center transition-all duration-300 ${isSearchExpanded ? 'w-36 sm:w-64' : 'w-8 sm:w-10'}`}>
+                {isSearchExpanded ? (
+                  <div className="w-full relative animate-fade-in">
+                    <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Buscar producto..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onBlur={() => { if(!searchQuery) setIsSearchExpanded(false); }}
+                      className="w-full pl-9 pr-8 sm:pl-10 py-1.5 sm:py-2 text-xs sm:text-sm bg-white border border-red-400 rounded-full outline-none focus:ring-2 focus:ring-red-500 shadow-sm transition-all"
+                    />
+                    <button 
+                      onMouseDown={(e) => e.preventDefault()} // Evita que se pierda el foco y cierre antes de limpiar
+                      onClick={() => { setIsSearchExpanded(false); setSearchQuery(''); }} 
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-4 h-4"/>
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setIsSearchExpanded(true)} title="Buscar producto" className="w-full h-full flex items-center justify-center text-stone-600 hover:text-red-600 transition-colors p-1 sm:p-2">
+                    <Search className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </button>
+                )}
+              </div>
+
+              {/* CARRITO DE COMPRAS */}
               <div className="relative text-stone-600 hover:text-red-600 transition-colors cursor-pointer group p-1 sm:p-2" onClick={() => document.getElementById('cart-section')?.scrollIntoView({behavior: 'smooth'})}>
                 <ShoppingCart className="w-6 h-6 group-hover:scale-110 transition-transform" />
                 {cartCount > 0 && (
@@ -300,10 +357,11 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
                 )}
               </div>
               
+              {/* BOTÓN ADMIN */}
               <button onClick={onLoginClick} title="Ingreso Administrativo" className="flex items-center gap-2 text-stone-300 hover:text-stone-800 transition-colors ml-1 sm:ml-2">
                 <User className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -1112,12 +1170,10 @@ function AdminCategories({ categories }: any) {
   );
 }
 
-function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }: any) {
+function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, searchQuery }: any) {
   const [checkoutStep, setCheckoutStep] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [showToast, setShowToast] = useState(false);
   
   const [previewProduct, setPreviewProduct] = useState<any>(null);
@@ -1278,43 +1334,23 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
           </div>
         </div>
 
-        {/* FILTROS Y BÚSQUEDA */}
-        <div className="flex flex-col gap-4 mb-6 w-full min-w-0">
+        {/* FILTROS DE PRODUCTOS */}
+        <div className="flex flex-col gap-3 mb-6 w-full min-w-0">
           
-          {/* Fila 1: Categorías (Ocupa toda la fila arriba) */}
-          <div className={`flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full min-w-0 transition-all duration-300 ${isSearchExpanded ? 'hidden md:flex opacity-50 xl:opacity-100' : 'flex'}`}>
+          {/* Fila 1: Categorías */}
+          <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full min-w-0">
             <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shrink-0 ${selectedCategory === 'all' ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>Todos</button>
             {categories.map((cat: any) => (
               <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ${selectedCategory === cat.id ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>{cat.name}</button>
             ))}
           </div>
           
-          {/* Fila 2: Filtros de Precio y Búsqueda */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full min-w-0">
-            
-            {/* Filtros de Precio */}
-            <div className={`flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full sm:w-auto min-w-0 flex-1 transition-all duration-300 ${isSearchExpanded ? 'hidden sm:flex opacity-50 xl:opacity-100' : 'flex'}`}>
-              <button onClick={() => setPriceFilter('all')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${priceFilter === 'all' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Cualquier Precio</button>
-              <button onClick={() => setPriceFilter('under20')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'under20' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Menos de $20</button>
-              <button onClick={() => setPriceFilter('20to40')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === '20to40' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>$20 - $40</button>
-              <button onClick={() => setPriceFilter('premium')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'premium' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Premium</button>
-            </div>
-            
-            {/* Lupa / Búsqueda */}
-            <div className={`relative shrink-0 transition-all duration-300 flex justify-end ${isSearchExpanded ? 'w-full sm:w-72' : 'w-auto'}`}>
-              {!isSearchExpanded ? (
-                <button onClick={() => setIsSearchExpanded(true)} className="p-2.5 px-4 bg-white border border-stone-200 rounded-xl text-stone-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all flex items-center gap-2">
-                  <Search className="w-5 h-5" />
-                  <span className="text-sm font-bold hidden sm:block">Buscar</span>
-                </button>
-              ) : (
-                <div className="relative w-full animate-fade-in">
-                  <Search className="w-5 h-5 absolute left-4 top-2.5 text-stone-400" />
-                  <input autoFocus type="text" placeholder="Buscar producto..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onBlur={() => { if(!searchQuery) setIsSearchExpanded(false); }} className="w-full pl-11 pr-10 py-2.5 bg-white border border-red-500 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 shadow-sm" />
-                  <button onClick={() => { setIsSearchExpanded(false); setSearchQuery(''); }} className="absolute right-3 top-2.5 text-stone-400 hover:text-red-500 transition-colors"><X className="w-5 h-5"/></button>
-                </div>
-              )}
-            </div>
+          {/* Fila 2: Filtros de Precio */}
+          <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full min-w-0">
+            <button onClick={() => setPriceFilter('all')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${priceFilter === 'all' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>Cualquier Precio</button>
+            <button onClick={() => setPriceFilter('under20')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'under20' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>Menos de $20</button>
+            <button onClick={() => setPriceFilter('20to40')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === '20to40' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>$20 - $40</button>
+            <button onClick={() => setPriceFilter('premium')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'premium' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>Premium</button>
           </div>
 
         </div>
