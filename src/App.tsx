@@ -45,16 +45,29 @@ export default function App() {
   const [view, setView] = useState('app');
 
   useEffect(() => {
-    const fetchBcv = async () => {
-      try {
-        const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv');
-        const data = await res.json();
-        if (data?.monitors?.bcv?.price) setBcvRate(data.monitors.bcv.price);
-      } catch (e) {
-        console.log("No se pudo conectar al servidor del BCV. Usando tasa de respaldo.");
+    // ESCUCHAR LA TASA BCV DIRECTO DESDE FIREBASE
+    const unsubBcv = onSnapshot(doc(db, 'settings', 'bcv'), (docSnap) => {
+      if (docSnap.exists() && docSnap.data().rate) {
+        setBcvRate(docSnap.data().rate);
+      } else {
+        // Si no existe en Firebase aún, busca la automática y la guarda
+        const fetchBcv = async () => {
+          try {
+            const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv');
+            const data = await res.json();
+            if (data?.monitors?.bcv?.price) {
+              const fetchedRate = data.monitors.bcv.price;
+              setBcvRate(fetchedRate);
+              setDoc(doc(db, 'settings', 'bcv'), { rate: fetchedRate }, { merge: true });
+            }
+          } catch (e) {
+            console.log("No se pudo conectar al servidor del BCV. Usando tasa de respaldo.");
+          }
+        };
+        fetchBcv();
       }
-    };
-    fetchBcv();
+    });
+    return () => unsubBcv();
   }, []);
 
   useEffect(() => {
@@ -104,6 +117,16 @@ export default function App() {
     setCart([]);
   };
 
+  // FUNCIÓN PARA GUARDAR LA TASA EN FIREBASE
+  const handleSaveBcvRate = async (newRate: number) => {
+    if (!newRate || isNaN(newRate)) return;
+    try {
+      await setDoc(doc(db, 'settings', 'bcv'), { rate: newRate }, { merge: true });
+    } catch (error) {
+      console.error("Error al guardar la tasa:", error);
+    }
+  };
+
   if (loadingAuth) {
     return <div className="min-h-screen bg-stone-50 flex items-center justify-center font-bold text-red-600">Cargando plataforma...</div>;
   }
@@ -114,7 +137,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col font-sans">
-      <Navbar user={currentUser} onLogout={handleLogout} cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} bcvRate={bcvRate} setBcvRate={setBcvRate} onLoginClick={() => setView('login')} />
+      <Navbar user={currentUser} onLogout={handleLogout} cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} bcvRate={bcvRate} setBcvRate={setBcvRate} onSaveBcv={handleSaveBcvRate} onLoginClick={() => setView('login')} />
       <main className="flex-grow container mx-auto px-4 py-8 relative">
         {currentUser?.role === 'admin' ? (
           <AdminDashboard products={products} categories={categories} orders={orders} bcvRate={bcvRate} />
@@ -222,7 +245,7 @@ function AuthScreen({ view, setView }: any) {
   );
 }
 
-function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onLoginClick }: any) {
+function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onLoginClick }: any) {
   return (
     <nav className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 print:hidden transition-all">
       <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex justify-between items-center">
@@ -237,7 +260,15 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onLoginClick }
             <span className="hidden sm:inline text-xs font-bold text-green-800">Tasa BCV:</span>
             <span className="sm:hidden text-[10px] font-bold text-green-800">BCV:</span>
             {user?.role === 'admin' ? (
-              <input type="number" step="0.01" value={bcvRate} onChange={(e) => setBcvRate(Number(e.target.value))} className="w-12 sm:w-16 text-[10px] sm:text-xs px-1 border-b border-green-300 bg-transparent outline-none font-bold text-green-900 focus:border-green-500" />
+              <input 
+                type="number" 
+                step="0.01" 
+                value={bcvRate} 
+                onChange={(e) => setBcvRate(Number(e.target.value))} 
+                onBlur={(e) => onSaveBcv(Number(e.target.value))}
+                onKeyDown={(e) => e.key === 'Enter' && onSaveBcv(Number((e.target as HTMLInputElement).value))}
+                className="w-12 sm:w-16 text-[10px] sm:text-xs px-1 border-b border-green-300 bg-transparent outline-none font-bold text-green-900 focus:border-green-500" 
+              />
             ) : (
               <span className="text-[10px] sm:text-xs font-bold text-green-900">Bs. {bcvRate}</span>
             )}
