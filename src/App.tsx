@@ -1117,6 +1117,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [showToast, setShowToast] = useState(false);
   
   const [previewProduct, setPreviewProduct] = useState<any>(null);
@@ -1279,7 +1280,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
 
         {/* FILTROS Y BÚSQUEDA */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 w-full min-w-0">
-          <div className="flex flex-col md:flex-row gap-3 w-full flex-1 min-w-0 overflow-hidden">
+          <div className={`flex flex-col md:flex-row gap-3 w-full flex-1 min-w-0 overflow-hidden transition-all duration-300 ${isSearchExpanded ? 'hidden md:flex opacity-50 xl:opacity-100' : 'flex'}`}>
             {/* Categorías */}
             <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full md:w-auto flex-1 min-w-0">
               <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${selectedCategory === 'all' ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>Todos</button>
@@ -1297,9 +1298,19 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
             </div>
           </div>
           
-          <div className="relative w-full xl:w-64 shrink-0">
-            <Search className="w-5 h-5 absolute left-4 top-2.5 text-stone-400" />
-            <input type="text" placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 shadow-sm" />
+          <div className={`relative shrink-0 transition-all duration-300 flex justify-end ${isSearchExpanded ? 'w-full xl:w-72' : 'w-auto'}`}>
+            {!isSearchExpanded ? (
+              <button onClick={() => setIsSearchExpanded(true)} className="p-2.5 px-4 bg-white border border-stone-200 rounded-xl text-stone-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all flex items-center gap-2">
+                <Search className="w-5 h-5" />
+                <span className="text-sm font-bold hidden sm:block xl:hidden">Buscar</span>
+              </button>
+            ) : (
+              <div className="relative w-full animate-fade-in">
+                <Search className="w-5 h-5 absolute left-4 top-2.5 text-stone-400" />
+                <input autoFocus type="text" placeholder="Buscar producto..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onBlur={() => { if(!searchQuery) setIsSearchExpanded(false); }} className="w-full pl-11 pr-10 py-2.5 bg-white border border-red-500 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 shadow-sm" />
+                <button onClick={() => { setIsSearchExpanded(false); setSearchQuery(''); }} className="absolute right-3 top-2.5 text-stone-400 hover:text-red-500 transition-colors"><X className="w-5 h-5"/></button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1324,21 +1335,21 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
                 </div>
               </div>
               
-              <div className="p-5 flex flex-col flex-grow">
+              <div className="p-4 sm:p-5 flex flex-col flex-grow">
                 <h3 className="text-lg font-bold text-gray-800 line-clamp-1">{product.name}</h3>
                 <p className="text-stone-500 text-sm mb-4 mt-1 flex-grow line-clamp-2 leading-relaxed">{product.description}</p>
-                <div className="flex items-end justify-between mt-auto pt-4 border-t border-stone-100">
-                  <div>
-                    <div className="text-2xl font-black text-gray-900">${parseFloat(product.price).toFixed(2)}</div>
-                    <div className="text-xs text-stone-500 font-medium">Bs. {(product.price * bcvRate).toFixed(2)}</div>
+                <div className="flex flex-wrap items-center justify-between mt-auto pt-4 border-t border-stone-100 gap-2">
+                  <div className="min-w-0">
+                    <div className="text-xl sm:text-2xl font-black text-gray-900">${parseFloat(product.price).toFixed(2)}</div>
+                    <div className="text-[10px] sm:text-xs text-stone-500 font-medium">Bs. {(product.price * bcvRate).toFixed(2)}</div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 sm:gap-2 shrink-0 ml-auto">
                     {/* BOTÓN COMPRA RÁPIDA */}
-                    <button onClick={() => handleQuickBuy(product)} title="Comprar Ahora" className="bg-gray-100 text-gray-600 hover:bg-stone-800 hover:text-white p-3 rounded-xl transition-colors">
-                      <Zap className="w-5 h-5 fill-current" />
+                    <button onClick={() => handleQuickBuy(product)} title="Comprar Ahora" className="bg-gray-100 text-gray-600 hover:bg-stone-800 hover:text-white p-2.5 rounded-xl transition-colors shrink-0">
+                      <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
                     </button>
-                    <button onClick={() => addToCart(product)} title="Añadir al carrito" className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white p-3 rounded-xl transition-colors">
-                      <Plus className="w-5 h-5 font-bold" />
+                    <button onClick={() => addToCart(product)} title="Añadir al carrito" className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white p-2.5 rounded-xl transition-colors shrink-0">
+                      <Plus className="w-4 h-4 sm:w-5 sm:h-5 font-bold" />
                     </button>
                   </div>
                 </div>
