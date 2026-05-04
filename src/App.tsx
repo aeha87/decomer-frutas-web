@@ -1279,39 +1279,44 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate }
         </div>
 
         {/* FILTROS Y BÚSQUEDA */}
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 w-full min-w-0">
-          <div className={`flex flex-col md:flex-row gap-3 w-full flex-1 min-w-0 overflow-hidden transition-all duration-300 ${isSearchExpanded ? 'hidden md:flex opacity-50 xl:opacity-100' : 'flex'}`}>
-            {/* Categorías */}
-            <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full md:w-auto flex-1 min-w-0">
-              <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${selectedCategory === 'all' ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>Todos</button>
-              {categories.map((cat: any) => (
-                <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap ${selectedCategory === cat.id ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>{cat.name}</button>
-              ))}
-            </div>
-            
-            {/* Filtros de Precio */}
-            <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar border-l-0 md:border-l-2 md:pl-3 border-stone-200 w-full md:w-auto min-w-0">
-              <button onClick={() => setPriceFilter('all')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceFilter === 'all' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Cualquier Precio</button>
-              <button onClick={() => setPriceFilter('under20')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${priceFilter === 'under20' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Menos de $20</button>
-              <button onClick={() => setPriceFilter('20to40')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${priceFilter === '20to40' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>$20 - $40</button>
-              <button onClick={() => setPriceFilter('premium')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${priceFilter === 'premium' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Premium</button>
-            </div>
+        <div className="flex flex-col gap-4 mb-6 w-full min-w-0">
+          
+          {/* Fila 1: Categorías (Ocupa toda la fila arriba) */}
+          <div className={`flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full min-w-0 transition-all duration-300 ${isSearchExpanded ? 'hidden md:flex opacity-50 xl:opacity-100' : 'flex'}`}>
+            <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shrink-0 ${selectedCategory === 'all' ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>Todos</button>
+            {categories.map((cat: any) => (
+              <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ${selectedCategory === cat.id ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>{cat.name}</button>
+            ))}
           </div>
           
-          <div className={`relative shrink-0 transition-all duration-300 flex justify-end ${isSearchExpanded ? 'w-full xl:w-72' : 'w-auto'}`}>
-            {!isSearchExpanded ? (
-              <button onClick={() => setIsSearchExpanded(true)} className="p-2.5 px-4 bg-white border border-stone-200 rounded-xl text-stone-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all flex items-center gap-2">
-                <Search className="w-5 h-5" />
-                <span className="text-sm font-bold hidden sm:block xl:hidden">Buscar</span>
-              </button>
-            ) : (
-              <div className="relative w-full animate-fade-in">
-                <Search className="w-5 h-5 absolute left-4 top-2.5 text-stone-400" />
-                <input autoFocus type="text" placeholder="Buscar producto..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onBlur={() => { if(!searchQuery) setIsSearchExpanded(false); }} className="w-full pl-11 pr-10 py-2.5 bg-white border border-red-500 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 shadow-sm" />
-                <button onClick={() => { setIsSearchExpanded(false); setSearchQuery(''); }} className="absolute right-3 top-2.5 text-stone-400 hover:text-red-500 transition-colors"><X className="w-5 h-5"/></button>
-              </div>
-            )}
+          {/* Fila 2: Filtros de Precio y Búsqueda */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full min-w-0">
+            
+            {/* Filtros de Precio */}
+            <div className={`flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full sm:w-auto min-w-0 flex-1 transition-all duration-300 ${isSearchExpanded ? 'hidden sm:flex opacity-50 xl:opacity-100' : 'flex'}`}>
+              <button onClick={() => setPriceFilter('all')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${priceFilter === 'all' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Cualquier Precio</button>
+              <button onClick={() => setPriceFilter('under20')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'under20' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Menos de $20</button>
+              <button onClick={() => setPriceFilter('20to40')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === '20to40' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>$20 - $40</button>
+              <button onClick={() => setPriceFilter('premium')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'premium' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200'}`}>Premium</button>
+            </div>
+            
+            {/* Lupa / Búsqueda */}
+            <div className={`relative shrink-0 transition-all duration-300 flex justify-end ${isSearchExpanded ? 'w-full sm:w-72' : 'w-auto'}`}>
+              {!isSearchExpanded ? (
+                <button onClick={() => setIsSearchExpanded(true)} className="p-2.5 px-4 bg-white border border-stone-200 rounded-xl text-stone-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all flex items-center gap-2">
+                  <Search className="w-5 h-5" />
+                  <span className="text-sm font-bold hidden sm:block">Buscar</span>
+                </button>
+              ) : (
+                <div className="relative w-full animate-fade-in">
+                  <Search className="w-5 h-5 absolute left-4 top-2.5 text-stone-400" />
+                  <input autoFocus type="text" placeholder="Buscar producto..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onBlur={() => { if(!searchQuery) setIsSearchExpanded(false); }} className="w-full pl-11 pr-10 py-2.5 bg-white border border-red-500 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 shadow-sm" />
+                  <button onClick={() => { setIsSearchExpanded(false); setSearchQuery(''); }} className="absolute right-3 top-2.5 text-stone-400 hover:text-red-500 transition-colors"><X className="w-5 h-5"/></button>
+                </div>
+              )}
+            </div>
           </div>
+
         </div>
 
         {/* GRILLA DE PRODUCTOS */}
