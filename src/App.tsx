@@ -225,19 +225,21 @@ function AuthScreen({ view, setView }: any) {
 function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onLoginClick }: any) {
   return (
     <nav className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 print:hidden transition-all">
-      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
-          <img src="/logo.png" alt="Decomer Frutas" className="h-14 w-auto drop-shadow-sm hover:scale-105 transition-transform" />
+      <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex justify-between items-center">
+        <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
+          <img src="/logo.png" alt="Decomer Frutas" className="h-10 sm:h-14 w-auto drop-shadow-sm hover:scale-105 transition-transform" />
         </div>
         
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="hidden lg:flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 shadow-inner">
-            <Activity className="w-4 h-4 text-green-600" />
-            <span className="text-xs font-bold text-green-800">Tasa BCV:</span>
+        <div className="flex items-center gap-2 sm:gap-6">
+          {/* TASA BCV SIEMPRE VISIBLE Y ADAPTABLE */}
+          <div className="flex items-center gap-1 sm:gap-2 bg-green-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-green-200 shadow-inner">
+            <Activity className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
+            <span className="hidden sm:inline text-xs font-bold text-green-800">Tasa BCV:</span>
+            <span className="sm:hidden text-[10px] font-bold text-green-800">BCV:</span>
             {user?.role === 'admin' ? (
-              <input type="number" step="0.01" value={bcvRate} onChange={(e) => setBcvRate(Number(e.target.value))} className="w-16 text-xs px-1 border-b border-green-300 bg-transparent outline-none font-bold text-green-900 focus:border-green-500" />
+              <input type="number" step="0.01" value={bcvRate} onChange={(e) => setBcvRate(Number(e.target.value))} className="w-12 sm:w-16 text-[10px] sm:text-xs px-1 border-b border-green-300 bg-transparent outline-none font-bold text-green-900 focus:border-green-500" />
             ) : (
-              <span className="text-xs font-bold text-green-900">Bs. {bcvRate}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-green-900">Bs. {bcvRate}</span>
             )}
           </div>
 
@@ -247,24 +249,24 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onLoginClick }
                 Hola, <span className="font-semibold text-gray-800">{user.name || 'Admin'}</span>
                 <span className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold border border-red-200 shadow-sm">Admin</span>
               </div>
-              <button onClick={onLogout} className="flex items-center gap-2 text-stone-500 hover:text-red-600 transition-colors">
+              <button onClick={onLogout} className="flex items-center gap-2 text-stone-500 hover:text-red-600 transition-colors p-2">
                 <LogOut className="w-5 h-5" />
                 <span className="hidden sm:block text-sm font-medium">Salir</span>
               </button>
             </>
           ) : (
             <>
-              <div className="relative text-stone-600 hover:text-red-600 transition-colors cursor-pointer group" onClick={() => document.getElementById('cart-section')?.scrollIntoView({behavior: 'smooth'})}>
+              <div className="relative text-stone-600 hover:text-red-600 transition-colors cursor-pointer group p-1 sm:p-2" onClick={() => document.getElementById('cart-section')?.scrollIntoView({behavior: 'smooth'})}>
                 <ShoppingCart className="w-6 h-6 group-hover:scale-110 transition-transform" />
                 {cartCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-bounce shadow-md">
+                  <span className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-red-600 text-white text-[10px] sm:text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center animate-bounce shadow-md">
                     {cartCount}
                   </span>
                 )}
               </div>
               
-              <button onClick={onLoginClick} title="Ingreso Administrativo" className="flex items-center gap-2 text-stone-300 hover:text-stone-800 transition-colors ml-2">
-                <User className="w-5 h-5" />
+              <button onClick={onLoginClick} title="Ingreso Administrativo" className="flex items-center gap-2 text-stone-300 hover:text-stone-800 transition-colors ml-1 sm:ml-2">
+                <User className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </>
           )}
