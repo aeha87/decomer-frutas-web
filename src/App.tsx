@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDoc, setDoc } from "firebase/firestore";
+// ¡AQUÍ ESTABA EL ERROR! Faltaba importar Clock. Ya está agregado.
 import { 
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook,
   CheckCircle, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, 
-  Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight
+  Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -100,7 +101,6 @@ export default function App() {
     let unsubOrders = () => {};
     if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
-        // BLINDAJE: Si la orden no tiene fecha válida, previene el crasheo asumiendo 0
         const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => {
           const timeA = a.date ? new Date(a.date).getTime() : 0;
           const timeB = b.date ? new Date(b.date).getTime() : 0;
@@ -415,15 +415,17 @@ function AdminKPIs({ orders, bcvRate }: any) {
   const monthOrders = validOrders.filter((o: any) => {
     if(!o.date) return false;
     const d = new Date(o.date);
+    if(isNaN(d.getTime())) return false; // Protección extra
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
 
   const todayOrders = validOrders.filter((o: any) => {
     if(!o.date) return false;
-    return new Date(o.date).toLocaleDateString() === todayStr;
+    const d = new Date(o.date);
+    if(isNaN(d.getTime())) return false; // Protección extra
+    return d.toLocaleDateString() === todayStr;
   });
 
-  // BLINDAJE: Number() asegura que si el totalUSD se guardó extraño o vacío, sea 0 para que Math no falle
   const monthSalesUSD = monthOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
   const todaySalesUSD = todayOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
   const totalHistóricoUSD = validOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
@@ -500,7 +502,6 @@ function AdminCustomers({ orders }: any) {
   orders.forEach((order: any) => {
     if(order.status === 'Cancelado') return;
 
-    // BLINDAJE: String() asegura que no haya errores de tipo
     const name = String(order.senderName || order.customerName || 'Cliente Anónimo');
     const phone = String(order.senderPhone || order.phone || 'Sin Teléfono');
     
@@ -682,6 +683,12 @@ function AdminOrders({ orders, bcvRate, products }: any) {
     setManualOrder({ ...manualOrder, items: newItems });
     setManualQty(1);
   };
+  
+  const handleRemoveManualItem = (index: number) => {
+    const newItems = [...manualOrder.items];
+    newItems.splice(index, 1);
+    setManualOrder({ ...manualOrder, items: newItems });
+  };
 
   const handleCreateManualOrder = async (e: any) => {
     e.preventDefault();
@@ -715,7 +722,6 @@ function AdminOrders({ orders, bcvRate, products }: any) {
     }
   };
 
-  // BLINDAJE EN FILTROS: Cast seguro a String para evitar que teléfonos/IDs guardados como enteros rompan el .includes
   const filteredOrders = orders.filter((order: any) => {
     const matchesSearch = 
       String(order.displayId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
