@@ -407,43 +407,54 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
   );
 }
 
+// --- MÓDULO REDISEÑADO: RUTAS DE ENTREGA DINÁMICO ---
 function AdminDeliveryRoute({ orders, bcvRate }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedShift, setSelectedShift] = useState('Todos');
-  const [routeOrders, setRouteOrders] = useState([]);
+  const [routeIds, setRouteIds] = useState([]); // Array para mantener el orden de los IDs seleccionados
 
+  // Limpiar la ruta en construcción si cambias de día o turno
   useEffect(() => {
-    const filtered = orders.filter(o => {
-      if (o.status === 'Cancelado') return false; 
-      
-      const orderDate = o.deliveryDate || (o.date ? o.date.split('T')[0] : '');
-      if (orderDate !== selectedDate) return false;
+    setRouteIds([]);
+  }, [selectedDate, selectedShift]);
 
-      if (selectedShift !== 'Todos') {
-        const orderShift = o.deliveryTimeSlot || '';
-        if (selectedShift === 'Mañana' && !orderShift.includes('Mañana')) return false;
-        if (selectedShift === 'Tarde' && !orderShift.includes('Tarde')) return false;
-      }
-      return true;
-    });
-
-    const currentIds = routeOrders.map(ro => ro.id);
-    const newOrders = filtered.filter(f => !currentIds.includes(f.id));
-    const updatedExisting = routeOrders.map(ro => filtered.find(f => f.id === ro.id)).filter(Boolean);
+  // Filtrar todos los pedidos que aplican para este día y turno (excluyendo cancelados)
+  const filteredOrders = orders.filter(o => {
+    if (o.status === 'Cancelado') return false; 
     
-    setRouteOrders([...updatedExisting, ...newOrders]);
-  }, [orders, selectedDate, selectedShift]);
+    const orderDate = o.deliveryDate || (o.date ? o.date.split('T')[0] : '');
+    if (orderDate !== selectedDate) return false;
+
+    if (selectedShift !== 'Todos') {
+      const orderShift = o.deliveryTimeSlot || '';
+      if (selectedShift === 'Mañana' && !orderShift.includes('Mañana')) return false;
+      if (selectedShift === 'Tarde' && !orderShift.includes('Tarde')) return false;
+    }
+    return true;
+  });
+
+  // Dividir los pedidos en dos grupos: Los que están en la ruta actual y los disponibles
+  const routeOrders = routeIds.map(id => filteredOrders.find(o => o.id === id)).filter(Boolean);
+  const availableOrders = filteredOrders.filter(o => !routeIds.includes(o.id));
+
+  const addToRoute = (id) => {
+    setRouteIds([...routeIds, id]);
+  };
+
+  const removeFromRoute = (id) => {
+    setRouteIds(routeIds.filter(routeId => routeId !== id));
+  };
 
   const moveOrder = (index, direction) => {
     if (direction === -1 && index === 0) return;
-    if (direction === 1 && index === routeOrders.length - 1) return;
+    if (direction === 1 && index === routeIds.length - 1) return;
     
-    const newRoute = [...routeOrders];
-    const temp = newRoute[index];
-    newRoute[index] = newRoute[index + direction];
-    newRoute[index + direction] = temp;
+    const newRouteIds = [...routeIds];
+    const temp = newRouteIds[index];
+    newRouteIds[index] = newRouteIds[index + direction];
+    newRouteIds[index + direction] = temp;
     
-    setRouteOrders(newRoute);
+    setRouteIds(newRouteIds);
   };
 
   const calculateBalance = (order) => {
@@ -457,14 +468,14 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
   };
 
   const generateWhatsAppMessage = () => {
+    if (routeOrders.length === 0) {
+      alert("No has añadido pedidos a la ruta actual.");
+      return;
+    }
+
     let msg = `🚚 *RUTA DE ENTREGA DECOMER* 🚚\n`;
     msg += `📅 *Fecha:* ${selectedDate.split('-').reverse().join('/')}\n`;
     msg += `⏰ *Turno:* ${selectedShift}\n\n`;
-
-    if (routeOrders.length === 0) {
-      alert("No hay pedidos en la ruta para generar el mensaje.");
-      return;
-    }
 
     routeOrders.forEach((order, index) => {
       const balance = calculateBalance(order);
@@ -497,14 +508,15 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Map className="w-6 h-6 text-red-600"/> Enrutador de Entregas</h2>
-        <p className="text-stone-500">Organiza las paradas y genera el resumen para el motorizado.</p>
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Map className="w-6 h-6 text-red-600"/> Constructor de Rutas</h2>
+        <p className="text-stone-500">Selecciona los pedidos y arma la ruta específica para un motorizado.</p>
       </div>
 
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-end">
-        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-          <div>
-            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">Fecha de Entrega</label>
+      {/* Panel de Filtros */}
+      <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex flex-col md:flex-row gap-4 w-full">
+          <div className="flex-1">
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">1. Selecciona la Fecha</label>
             <input 
               type="date" 
               value={selectedDate} 
@@ -512,8 +524,8 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
               className="px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:border-red-500 text-sm font-bold text-gray-800 w-full"
             />
           </div>
-          <div>
-            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">Turno</label>
+          <div className="flex-1">
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">2. Selecciona el Turno</label>
             <div className="flex bg-stone-100 p-1 rounded-xl w-full">
               {['Todos', 'Mañana', 'Tarde'].map(shift => (
                 <button 
@@ -527,88 +539,165 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
             </div>
           </div>
         </div>
-        
-        <button 
-          onClick={generateWhatsAppMessage}
-          disabled={routeOrders.length === 0}
-          className="bg-[#25D366] hover:bg-[#1ebd5a] disabled:bg-stone-300 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2 w-full md:w-auto justify-center"
-        >
-          <Share2 className="w-4 h-4" /> Enviar Ruta por WhatsApp
-        </button>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden">
-        <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
-          <h3 className="font-bold text-stone-700 text-sm flex items-center gap-2"><Truck className="w-4 h-4"/> Paradas Activas ({routeOrders.length})</h3>
-          <p className="text-xs text-stone-500">Usa las flechas para ordenar la ruta.</p>
-        </div>
-
-        <div className="divide-y divide-stone-100">
-          {routeOrders.length === 0 ? (
-            <div className="p-12 text-center text-stone-400">
-              <Map className="w-12 h-12 mx-auto mb-3 opacity-20" />
-              <p className="font-medium">No hay entregas programadas para esta fecha y turno.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* PANEL 1: PEDIDOS DISPONIBLES */}
+        <div className="bg-white rounded-3xl shadow-sm border border-stone-200 flex flex-col max-h-[800px]">
+          <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center rounded-t-3xl shrink-0">
+            <div>
+              <h3 className="font-bold text-stone-700 text-sm flex items-center gap-2"><Package className="w-4 h-4"/> Pedidos Disponibles</h3>
+              <p className="text-[10px] text-stone-500 mt-0.5">Pendientes por asignar ({availableOrders.length})</p>
             </div>
-          ) : (
-            routeOrders.map((order, index) => {
-              const balance = calculateBalance(order);
-              const isCompleted = order.status === 'Completado';
-
-              return (
-              <div key={order.id} className={`p-4 sm:p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center transition-colors ${isCompleted ? 'bg-stone-50 opacity-60' : 'hover:bg-blue-50/30'}`}>
-                
-                <div className="flex flex-row sm:flex-col gap-1 shrink-0 bg-stone-100 p-1.5 rounded-xl">
-                  <button onClick={() => moveOrder(index, -1)} disabled={index === 0} className="p-1.5 text-stone-500 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded-lg transition-colors"><ArrowUp className="w-4 h-4"/></button>
-                  <div className="w-8 h-8 flex items-center justify-center font-black text-gray-800 bg-white rounded-lg shadow-sm">{index + 1}</div>
-                  <button onClick={() => moveOrder(index, 1)} disabled={index === routeOrders.length - 1} className="p-1.5 text-stone-500 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded-lg transition-colors"><ArrowDown className="w-4 h-4"/></button>
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-black text-gray-900 text-lg">{order.displayId}</span>
-                    {balance > 0 ? (
-                      <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-black flex items-center gap-1 border border-red-200">
-                        <AlertTriangle className="w-3 h-3" /> COBRAR: ${balance.toFixed(2)}
-                      </span>
-                    ) : (
-                      <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-green-200">Pagado</span>
-                    )}
-                    {isCompleted && <span className="bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">Entregado</span>}
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
-                    <div>
-                      <p><span className="font-bold text-stone-500">Recibe:</span> {order.recipientName || order.customerName}</p>
-                      <p className="flex items-center gap-1 text-stone-500"><Phone className="w-3 h-3"/> {order.recipientPhone || order.phone}</p>
-                    </div>
-                    <div>
-                      <p className="line-clamp-2"><span className="font-bold text-stone-500">Dirección:</span> {order.deliveryAddress || order.address}</p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-xs text-stone-500 font-medium truncate pt-1">
-                    <span className="font-bold text-stone-400">Productos:</span> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
-                  </p>
-                </div>
-
-                <div className="shrink-0 flex sm:flex-col gap-2 w-full sm:w-auto">
-                   <select 
-                    value={order.status}
-                    onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
-                    className={`text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-xl border-0 outline-none cursor-pointer shadow-sm w-full sm:w-36 text-center
-                      ${order.status === 'Completado' ? 'bg-green-100 text-green-700' : 'bg-white border border-stone-200 text-stone-600'}`}
-                  >
-                    <option value="En Preparación">En Preparación</option>
-                    <option value="Abonado">Abonado</option>
-                    <option value="Pagado">Pagado</option>
-                    <option value="Completado">✓ Entregado</option>
-                  </select>
-                </div>
-
+          </div>
+          <div className="overflow-y-auto p-3 space-y-3 flex-grow bg-stone-50/50">
+            {availableOrders.length === 0 ? (
+              <div className="p-10 text-center text-stone-400">
+                <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p className="font-medium text-sm">No hay pedidos pendientes para este filtro.</p>
               </div>
-            )})
-          )}
+            ) : (
+              availableOrders.map(order => {
+                const balance = calculateBalance(order);
+                return (
+                  <div key={order.id} className="bg-white border border-stone-200 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col gap-3 relative">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <span className="font-black text-gray-900 text-base">{order.displayId}</span>
+                        <p className="text-xs font-bold text-gray-700 mt-1">{order.recipientName || order.customerName}</p>
+                      </div>
+                      <button 
+                        onClick={() => addToRoute(order.id)}
+                        className="bg-stone-900 hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Añadir a Ruta
+                      </button>
+                    </div>
+                    
+                    <p className="text-xs text-stone-500 leading-relaxed line-clamp-2">
+                      <span className="font-bold">Dir:</span> {order.deliveryAddress || order.address}
+                    </p>
+                    
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
+                      {balance > 0 ? (
+                        <span className="bg-red-50 text-red-600 px-2 py-1 rounded-md text-[10px] font-black border border-red-100">
+                          COBRAR: ${balance.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="bg-green-50 text-green-600 px-2 py-1 rounded-md text-[10px] font-black border border-green-100">
+                          PAGADO
+                        </span>
+                      )}
+                      <span className="text-[10px] font-bold text-stone-400 truncate max-w-[150px]">
+                        {order.items.length} items
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
+
+        {/* PANEL 2: RUTA EN CONSTRUCCIÓN */}
+        <div className="bg-white rounded-3xl shadow-lg border-2 border-green-500 flex flex-col max-h-[800px] relative overflow-hidden">
+          <div className="p-4 bg-green-50 border-b border-green-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
+            <div>
+              <h3 className="font-black text-green-800 text-base flex items-center gap-2"><Truck className="w-5 h-5"/> Ruta a Enviar ({routeOrders.length})</h3>
+              <p className="text-[10px] text-green-600/80 mt-0.5 font-bold uppercase tracking-wider">Ordena las paradas y genera el mensaje</p>
+            </div>
+            
+            <div className="flex gap-2 w-full sm:w-auto">
+              {routeOrders.length > 0 && (
+                <button 
+                  onClick={() => setRouteIds([])}
+                  className="bg-white border border-red-200 text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors shrink-0"
+                  title="Limpiar Ruta"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+              <button 
+                onClick={generateWhatsAppMessage}
+                disabled={routeOrders.length === 0}
+                className="bg-[#25D366] hover:bg-[#1ebd5a] disabled:bg-stone-300 disabled:border-stone-300 border border-[#1ebd5a] text-white px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 flex-1 sm:flex-none"
+              >
+                <Share2 className="w-4 h-4" /> Enviar Ruta
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-y-auto flex-grow bg-white">
+            {routeOrders.length === 0 ? (
+              <div className="p-12 text-center text-green-600/40 flex flex-col items-center justify-center h-full">
+                <Map className="w-16 h-16 mb-4 opacity-50" />
+                <p className="font-bold text-sm">La ruta está vacía.</p>
+                <p className="text-xs mt-1 max-w-[200px]">Añade pedidos desde el panel izquierdo para armar el recorrido.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-stone-100">
+                {routeOrders.map((order, index) => {
+                  const balance = calculateBalance(order);
+                  return (
+                    <div key={order.id} className="p-4 flex gap-3 hover:bg-green-50/30 transition-colors">
+                      
+                      {/* Controles de Orden (Izquierda) */}
+                      <div className="flex flex-col gap-1 shrink-0 bg-stone-50 p-1 rounded-xl h-fit border border-stone-100">
+                        <button onClick={() => moveOrder(index, -1)} disabled={index === 0} className="p-1 text-stone-400 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded transition-colors"><ArrowUp className="w-4 h-4"/></button>
+                        <div className="w-6 h-6 flex items-center justify-center font-black text-green-700 bg-green-100 rounded text-xs">{index + 1}</div>
+                        <button onClick={() => moveOrder(index, 1)} disabled={index === routeOrders.length - 1} className="p-1 text-stone-400 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded transition-colors"><ArrowDown className="w-4 h-4"/></button>
+                      </div>
+
+                      {/* Info del Pedido (Centro) */}
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-black text-gray-900 block leading-none">{order.displayId}</span>
+                            <span className="text-xs font-bold text-stone-500">{order.recipientName || order.customerName}</span>
+                          </div>
+                          <button 
+                            onClick={() => removeFromRoute(order.id)}
+                            className="text-stone-400 hover:text-red-500 bg-stone-50 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                            title="Quitar de esta ruta"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        
+                        <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
+                          {order.deliveryAddress || order.address}
+                        </p>
+                        
+                        <div className="flex justify-between items-center bg-stone-50 p-2 rounded-lg border border-stone-100">
+                          {balance > 0 ? (
+                            <span className="text-red-600 text-[10px] font-black flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> COBRAR ${balance.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-green-600 text-[10px] font-black">PAGADO</span>
+                          )}
+                          
+                          <select 
+                            value={order.status}
+                            onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
+                            className="text-[10px] font-bold uppercase tracking-wider bg-transparent border-none outline-none cursor-pointer text-stone-500 text-right text-ellipsis w-24"
+                          >
+                            <option value="En Preparación">En Prep.</option>
+                            <option value="Abonado">Abonado</option>
+                            <option value="Pagado">Pagado</option>
+                            <option value="Completado">✓ Entregado</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -972,7 +1061,6 @@ function AdminOrders({ orders, bcvRate, products }) {
     };
 
     if (editOrderId) {
-      // Recalcular estado por si el total cambió por edición de productos
       const existingOrder = orders.find(o => o.id === editOrderId);
       const totalPaid = (existingOrder.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
       let newStatus = existingOrder.status;
@@ -1112,7 +1200,6 @@ function AdminOrders({ orders, bcvRate, products }) {
                     <option value="Cancelado">Cancelado</option>
                   </select>
                   
-                  {/* Botón de Editar Pedido */}
                   <button onClick={() => openEditModal(order)} className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors shadow-sm" title="Editar Pedido">
                     <Edit className="w-5 h-5" />
                   </button>
