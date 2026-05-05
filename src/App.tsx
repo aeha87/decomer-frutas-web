@@ -614,12 +614,13 @@ function AdminOrders({ orders, bcvRate, products }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
 
-  // Modal Pago con soporte Multimoneda
+  // Modal Pago con soporte Multimoneda y Tasa Editable
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null });
   const [paymentForm, setPaymentForm] = useState({ 
     method: 'Pago Móvil', 
     inputAmount: '',
     inputCurrency: 'BS', // 'USD' o 'BS'
+    customBcvRate: bcvRate, // Agregado: permite cobrar a tasa anterior
     reference: '', 
     bank: VENEZUELAN_BANKS[0], 
     phone: '',
@@ -630,8 +631,19 @@ function AdminOrders({ orders, bcvRate, products }) {
   const [viewPaymentsModal, setViewPaymentsModal] = useState({ isOpen: false, orderId: null });
   const [receiptModal, setReceiptModal] = useState({ isOpen: false, order: null });
 
+  // Pedido manual refactorizado (ahora pide lo mismo que el cliente)
   const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
-  const [manualOrder, setManualOrder] = useState({ customerName: '', phone: '', address: '', notes: '', items: [] });
+  const [manualOrder, setManualOrder] = useState({ 
+    senderName: '', 
+    senderPhone: '', 
+    recipientName: '', 
+    recipientPhone: '', 
+    deliveryAddress: '', 
+    deliveryDate: '', 
+    deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', 
+    dedication: '', 
+    items: [] 
+  });
   const [manualProduct, setManualProduct] = useState('');
   const [manualQty, setManualQty] = useState(1);
 
@@ -643,7 +655,8 @@ function AdminOrders({ orders, bcvRate, products }) {
     setPaymentForm({ 
       method: 'Pago Móvil', 
       inputAmount: '', 
-      inputCurrency: 'BS', // Por defecto arranca en Bs porque arranca en Pago Móvil
+      inputCurrency: 'BS', 
+      customBcvRate: bcvRate, // Seteamos la tasa actual por defecto
       reference: '', 
       bank: VENEZUELAN_BANKS[0], 
       phone: '', 
@@ -658,9 +671,10 @@ function AdminOrders({ orders, bcvRate, products }) {
     const order = orders.find((o) => o.id === paymentModal.orderId);
     if (!order) return;
 
-    // Calcular el monto en dólares a guardar según la moneda seleccionada
+    // Calcular el monto en dólares usando la tasa seleccionada por el admin
+    const rateToUse = Number(paymentForm.customBcvRate) || bcvRate;
     const amountUSDToSave = paymentForm.inputCurrency === 'BS' 
-      ? Number(paymentForm.inputAmount) / bcvRate 
+      ? Number(paymentForm.inputAmount) / rateToUse 
       : Number(paymentForm.inputAmount);
 
     if (!amountUSDToSave || amountUSDToSave <= 0) return alert("Ingresa un monto válido");
@@ -744,20 +758,33 @@ function AdminOrders({ orders, bcvRate, products }) {
     e.preventDefault();
     if (manualOrder.items.length === 0) return alert("Debes agregar al menos un producto.");
     const totalUSD = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
+    
     await addDoc(collection(db, 'orders'), {
       displayId: `PED-M${Math.floor(Math.random() * 10000)}`,
-      customerName: manualOrder.customerName,
+      senderName: manualOrder.senderName,
+      senderPhone: manualOrder.senderPhone,
+      recipientName: manualOrder.recipientName,
+      recipientPhone: manualOrder.recipientPhone,
+      deliveryAddress: manualOrder.deliveryAddress,
+      deliveryDate: manualOrder.deliveryDate,
+      deliveryTimeSlot: manualOrder.deliveryTimeSlot,
+      dedication: manualOrder.dedication,
       items: manualOrder.items,
       totalUSD: totalUSD,
       status: 'Pendiente',
       payments: [],
       date: new Date().toISOString(),
-      notes: manualOrder.notes,
-      phone: manualOrder.phone,
-      address: manualOrder.address
+      // Mantenemos campos legacy por compatibilidad con visualización de tablas antiguas
+      customerName: manualOrder.senderName,
+      phone: manualOrder.senderPhone,
+      address: manualOrder.deliveryAddress
     });
+    
     setIsManualOrderOpen(false);
-    setManualOrder({ customerName: '', phone: '', address: '', notes: '', items: [] });
+    setManualOrder({ 
+      senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', 
+      deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] 
+    });
   };
 
   const getStatusColor = (status) => {
@@ -791,7 +818,7 @@ function AdminOrders({ orders, bcvRate, products }) {
           <p className="text-stone-500">Gestiona entregas y cobros</p>
         </div>
         <button onClick={() => setIsManualOrderOpen(true)} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg hover:shadow-xl text-sm">
-          <Plus className="w-5 h-5" /> Nuevo Pedido
+          <Plus className="w-5 h-5" /> Nuevo Pedido Manual
         </button>
       </div>
 
@@ -982,14 +1009,15 @@ function AdminOrders({ orders, bcvRate, products }) {
         const previouslyPaidUSD = (activeOrder.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
         const initialBalanceUSD = Math.max(0, orderTotalUSD - previouslyPaidUSD);
         
-        // Cálculos en tiempo real multimoneda
+        // Calculamos usando la tasa personalizada del formulario, o la global como fallback
+        const rateToUse = Number(paymentForm.customBcvRate) || bcvRate;
         const inputAmountConvertedUSD = paymentForm.inputCurrency === 'BS' 
-          ? (Number(paymentForm.inputAmount) || 0) / bcvRate 
+          ? (Number(paymentForm.inputAmount) || 0) / rateToUse 
           : (Number(paymentForm.inputAmount) || 0);
 
         const newRemainingUSD = Math.max(0, initialBalanceUSD - inputAmountConvertedUSD);
         const maxInputAllowed = paymentForm.inputCurrency === 'BS' 
-          ? (initialBalanceUSD * bcvRate).toFixed(2) 
+          ? (initialBalanceUSD * rateToUse).toFixed(2) 
           : initialBalanceUSD.toFixed(2);
 
         return (
@@ -1009,14 +1037,14 @@ function AdminOrders({ orders, bcvRate, products }) {
                 <div>
                   <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Deuda Actual</p>
                   <p className="text-2xl font-black text-red-500">${initialBalanceUSD.toFixed(2)}</p>
-                  <p className="text-xs font-bold text-stone-400">Bs. {(initialBalanceUSD * bcvRate).toFixed(2)}</p>
+                  <p className="text-xs font-bold text-stone-400">Bs. {(initialBalanceUSD * rateToUse).toFixed(2)}</p>
                 </div>
                 <div className="text-right border-l border-stone-300 pl-4">
                   <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Quedaría en</p>
                   <p className={`text-2xl font-black ${newRemainingUSD <= 0.01 ? 'text-green-500' : 'text-orange-500'}`}>
                     ${newRemainingUSD.toFixed(2)}
                   </p>
-                  <p className="text-xs font-bold text-stone-400">Bs. {(newRemainingUSD * bcvRate).toFixed(2)}</p>
+                  <p className="text-xs font-bold text-stone-400">Bs. {(newRemainingUSD * rateToUse).toFixed(2)}</p>
                 </div>
               </div>
               
@@ -1061,13 +1089,25 @@ function AdminOrders({ orders, bcvRate, products }) {
                       placeholder={`Max ${paymentForm.inputCurrency === 'USD' ? '$' : 'Bs. '}${maxInputAllowed}`} 
                     />
                   </div>
+                  
+                  {/* Tasa Editable por el Administrador */}
+                  {paymentForm.inputCurrency === 'BS' && (
+                    <div className="mt-3 pt-3 border-t border-stone-200">
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tasa BCV Aplicada para este cobro</label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-stone-500">Bs.</span>
+                        <input type="number" step="0.01" value={paymentForm.customBcvRate} onChange={e => setPaymentForm({...paymentForm, customBcvRate: e.target.value})} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg outline-none text-xs bg-white text-stone-700 font-bold focus:border-blue-500" />
+                        <button type="button" onClick={()=>setPaymentForm({...paymentForm, customBcvRate: bcvRate})} className="text-[10px] bg-stone-200 hover:bg-stone-300 px-2 py-1.5 rounded-lg font-bold text-stone-600 shrink-0">Usar Tasa de Hoy</button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Feedback visual de conversión cruzada */}
                   {paymentForm.inputAmount > 0 && (
-                    <div className="mt-2 text-center text-[11px] font-bold text-stone-500 bg-white py-1 rounded-lg border border-stone-100">
+                    <div className="mt-3 text-center text-[11px] font-bold text-stone-500 bg-white py-1.5 rounded-lg border border-stone-100 shadow-sm">
                       {paymentForm.inputCurrency === 'BS' 
                         ? `Al guardarse, el sistema lo registrará como $${inputAmountConvertedUSD.toFixed(2)}`
-                        : `El cliente debería enviarte Bs. ${(inputAmountConvertedUSD * bcvRate).toFixed(2)}`}
+                        : `El cliente debería enviarte Bs. ${(inputAmountConvertedUSD * rateToUse).toFixed(2)}`}
                     </div>
                   )}
                 </div>
@@ -1188,6 +1228,7 @@ function AdminOrders({ orders, bcvRate, products }) {
         );
       })()}
       
+      {/* --- MODAL PARA CREAR PEDIDO MANUAL REFACTORIZADO --- */}
       {isManualOrderOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -1196,38 +1237,69 @@ function AdminOrders({ orders, bcvRate, products }) {
               <button onClick={() => setIsManualOrderOpen(false)} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-grow">
+            <div className="p-6 overflow-y-auto flex-grow bg-white">
               <form id="manual-order-form" onSubmit={handleCreateManualOrder} className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Nombre del Cliente</label>
-                    <input required type="text" value={manualOrder.customerName} onChange={e => setManualOrder({...manualOrder, customerName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Teléfono</label>
-                    <input type="tel" value={manualOrder.phone} onChange={e => setManualOrder({...manualOrder, phone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
+                
+                {/* 1. Quien Envía */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><User className="w-4 h-4"/> 1. Datos del Cliente (Quien Paga/Envía)</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input required type="text" placeholder="Nombre completo" value={manualOrder.senderName} onChange={e => setManualOrder({...manualOrder, senderName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
+                    <input type="tel" placeholder="Teléfono" value={manualOrder.senderPhone} onChange={e => setManualOrder({...manualOrder, senderPhone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
                   </div>
                 </div>
 
-                <div className="bg-stone-50 p-5 rounded-2xl border border-stone-200">
-                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2"><ShoppingCart className="w-4 h-4"/> Añadir Productos</h4>
-                  <div className="flex flex-col sm:flex-row gap-3 mb-4 items-end">
+                {/* 2. Quien Recibe */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><Heart className="w-4 h-4"/> 2. Datos de quien recibe</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input required type="text" placeholder="Nombre de quien recibe" value={manualOrder.recipientName} onChange={e => setManualOrder({...manualOrder, recipientName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
+                    <input required type="tel" placeholder="Teléfono del destinatario" value={manualOrder.recipientPhone} onChange={e => setManualOrder({...manualOrder, recipientPhone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
+                  </div>
+                </div>
+
+                {/* 3. Entrega */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
+                  <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={manualOrder.deliveryAddress} onChange={e => setManualOrder({...manualOrder, deliveryAddress: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50 resize-none" />
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">Fecha de Entrega</label>
+                      <input required type="date" value={manualOrder.deliveryDate} onChange={e => setManualOrder({...manualOrder, deliveryDate: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50 text-stone-700" />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">Bloque Horario</label>
+                      <select required value={manualOrder.deliveryTimeSlot} onChange={e => setManualOrder({...manualOrder, deliveryTimeSlot: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50 text-stone-700">
+                        <option value="Mañana (8:00 AM - 12:00 PM)">☀️ Mañana (8am - 12pm)</option>
+                        <option value="Tarde (1:00 PM - 5:00 PM)">🌤️ Tarde (1pm - 5pm)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <textarea placeholder="Dedicatoria (Opcional)" rows={2} value={manualOrder.dedication} onChange={e => setManualOrder({...manualOrder, dedication: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-red-50/50 italic resize-none" />
+                </div>
+
+                {/* 4. Productos */}
+                <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200">
+                  <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"><ShoppingCart className="w-4 h-4"/> 4. Añadir Productos</h4>
+                  <div className="flex flex-col sm:flex-row gap-3 mb-2 items-end">
                     <div className="flex-1 w-full">
-                      <select value={manualProduct} onChange={e => setManualProduct(e.target.value)} className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white font-medium">
+                      <select value={manualProduct} onChange={e => setManualProduct(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white font-medium">
                         <option value="">Seleccionar del catálogo...</option>
                         {products.map((p) => <option key={p.id} value={p.id}>{p.isExtra ? '🎈 Extra:' : ''} {p.name} - ${Number(p.price).toFixed(2)}</option>)}
                       </select>
                     </div>
                     <div className="w-full sm:w-24">
-                      <input type="number" min="1" value={manualQty} onChange={e => setManualQty(e.target.value)} className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm text-center font-bold" />
+                      <input type="number" min="1" value={manualQty} onChange={e => setManualQty(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-center font-bold" />
                     </div>
-                    <button type="button" onClick={handleAddManualItem} className="w-full sm:w-auto bg-stone-900 hover:bg-black text-white px-5 py-3 rounded-xl text-sm font-bold shadow-md transition-colors">Añadir</button>
+                    <button type="button" onClick={handleAddManualItem} className="w-full sm:w-auto bg-stone-900 hover:bg-black text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md transition-colors">Añadir</button>
                   </div>
                   
                   {manualOrder.items.length > 0 && (
-                    <div className="mt-4 border-t border-stone-200 pt-4 space-y-2">
+                    <div className="mt-4 border-t border-stone-200 pt-3 space-y-2">
                       {manualOrder.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white border border-stone-100 p-3 rounded-xl shadow-sm">
+                        <div key={idx} className="flex justify-between items-center bg-white border border-stone-100 p-2.5 rounded-xl shadow-sm">
                           <div className="font-medium text-sm text-gray-800"><span className="font-black bg-stone-100 px-2 py-0.5 rounded mr-2">{item.quantity}x</span> {item.name}</div>
                           <div className="flex items-center gap-4">
                             <span className="font-black text-gray-900">${(Number(item.price) * item.quantity).toFixed(2)}</span>
@@ -1240,8 +1312,8 @@ function AdminOrders({ orders, bcvRate, products }) {
                 </div>
               </form>
             </div>
-            <div className="p-6 border-t border-stone-100 bg-white shrink-0">
-              <button form="manual-order-form" type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg text-sm flex justify-center items-center gap-2">
+            <div className="p-5 border-t border-stone-100 bg-white shrink-0">
+              <button form="manual-order-form" type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg text-sm flex justify-center items-center gap-2">
                 Generar Pedido <ArrowUpRight className="w-5 h-5"/>
               </button>
             </div>
