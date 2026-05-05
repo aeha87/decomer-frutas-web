@@ -6,7 +6,7 @@ import {
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook,
   CheckCircle, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, 
   Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock,
-  Map, ArrowUp, ArrowDown, Share2, AlertTriangle
+  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -384,9 +384,7 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
               {orders.filter((o)=>o.status==='Pendiente').length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{orders.filter((o)=>o.status==='Pendiente').length}</span>}
             </button>
             
-            {/* NUEVA PESTAÑA: Rutas de Entrega */}
             <button onClick={() => setActiveTab('delivery')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> Rutas de Entrega</button>
-            
             <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'customers' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
             
             <div className="pt-4 mt-4 border-t border-stone-100"></div>
@@ -409,22 +407,18 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
   );
 }
 
-// --- NUEVO COMPONENTE: RUTAS DE ENTREGA ---
 function AdminDeliveryRoute({ orders, bcvRate }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedShift, setSelectedShift] = useState('Todos');
   const [routeOrders, setRouteOrders] = useState([]);
 
-  // Filtrar órdenes al cambiar fecha o turno
   useEffect(() => {
     const filtered = orders.filter(o => {
-      if (o.status === 'Cancelado') return false; // Ignorar cancelados
+      if (o.status === 'Cancelado') return false; 
       
-      // Manejar la fecha (pedidos manuales viejos pueden no tener deliveryDate)
       const orderDate = o.deliveryDate || (o.date ? o.date.split('T')[0] : '');
       if (orderDate !== selectedDate) return false;
 
-      // Manejar turno
       if (selectedShift !== 'Todos') {
         const orderShift = o.deliveryTimeSlot || '';
         if (selectedShift === 'Mañana' && !orderShift.includes('Mañana')) return false;
@@ -433,11 +427,8 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
       return true;
     });
 
-    // Mantener el orden actual si ya estaban en la lista (para no desordenar al actualizar un pago)
     const currentIds = routeOrders.map(ro => ro.id);
     const newOrders = filtered.filter(f => !currentIds.includes(f.id));
-    
-    // Actualizar los datos de los que ya estaban y agregar los nuevos al final
     const updatedExisting = routeOrders.map(ro => filtered.find(f => f.id === ro.id)).filter(Boolean);
     
     setRouteOrders([...updatedExisting, ...newOrders]);
@@ -483,7 +474,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
       msg += `📞 *Teléfono:* ${order.recipientPhone || order.phone || order.senderPhone || 'N/A'}\n`;
       msg += `🏠 *Dirección:* ${order.deliveryAddress || order.address || 'N/A'}\n`;
       
-      // Resumen de productos
       const itemsList = order.items.map(i => `${i.quantity}x ${i.name}`).join(', ');
       msg += `📦 *Entregar:* ${itemsList}\n`;
 
@@ -511,7 +501,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
         <p className="text-stone-500">Organiza las paradas y genera el resumen para el motorizado.</p>
       </div>
 
-      {/* Controles de Filtro */}
       <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-end">
         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
           <div>
@@ -548,7 +537,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
         </button>
       </div>
 
-      {/* Lista Ruteable */}
       <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden">
         <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
           <h3 className="font-bold text-stone-700 text-sm flex items-center gap-2"><Truck className="w-4 h-4"/> Paradas Activas ({routeOrders.length})</h3>
@@ -569,14 +557,12 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
               return (
               <div key={order.id} className={`p-4 sm:p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center transition-colors ${isCompleted ? 'bg-stone-50 opacity-60' : 'hover:bg-blue-50/30'}`}>
                 
-                {/* Controles de Orden (Izquierda) */}
                 <div className="flex flex-row sm:flex-col gap-1 shrink-0 bg-stone-100 p-1.5 rounded-xl">
                   <button onClick={() => moveOrder(index, -1)} disabled={index === 0} className="p-1.5 text-stone-500 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded-lg transition-colors"><ArrowUp className="w-4 h-4"/></button>
                   <div className="w-8 h-8 flex items-center justify-center font-black text-gray-800 bg-white rounded-lg shadow-sm">{index + 1}</div>
                   <button onClick={() => moveOrder(index, 1)} disabled={index === routeOrders.length - 1} className="p-1.5 text-stone-500 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded-lg transition-colors"><ArrowDown className="w-4 h-4"/></button>
                 </div>
 
-                {/* Info del Pedido (Centro) */}
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-black text-gray-900 text-lg">{order.displayId}</span>
@@ -605,7 +591,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
                   </p>
                 </div>
 
-                {/* Status Rápido (Derecha) */}
                 <div className="shrink-0 flex sm:flex-col gap-2 w-full sm:w-auto">
                    <select 
                     value={order.status}
@@ -840,35 +825,22 @@ function AdminOrders({ orders, bcvRate, products }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
 
-  // Modal Pago con soporte Multimoneda y Tasa Editable
+  // Modal Pago
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null });
   const [paymentForm, setPaymentForm] = useState({ 
-    method: 'Pago Móvil', 
-    inputAmount: '',
-    inputCurrency: 'BS', // 'USD' o 'BS'
-    customBcvRate: bcvRate, // Agregado: permite cobrar a tasa anterior
-    reference: '', 
-    bank: VENEZUELAN_BANKS[0], 
-    phone: '',
-    accountName: '',
-    notes: '' 
+    method: 'Pago Móvil', inputAmount: '', inputCurrency: 'BS', customBcvRate: bcvRate, 
+    reference: '', bank: VENEZUELAN_BANKS[0], phone: '', accountName: '', notes: '' 
   });
   
   const [viewPaymentsModal, setViewPaymentsModal] = useState({ isOpen: false, orderId: null });
   const [receiptModal, setReceiptModal] = useState({ isOpen: false, order: null });
 
-  // Pedido manual refactorizado (ahora pide lo mismo que el cliente)
-  const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
+  // Modal Pedido Manual / Edición
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [editOrderId, setEditOrderId] = useState(null);
   const [manualOrder, setManualOrder] = useState({ 
-    senderName: '', 
-    senderPhone: '', 
-    recipientName: '', 
-    recipientPhone: '', 
-    deliveryAddress: '', 
-    deliveryDate: '', 
-    deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', 
-    dedication: '', 
-    items: [] 
+    senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', 
+    deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] 
   });
   const [manualProduct, setManualProduct] = useState('');
   const [manualQty, setManualQty] = useState(1);
@@ -879,15 +851,8 @@ function AdminOrders({ orders, bcvRate, products }) {
 
   const openPaymentModal = (order) => {
     setPaymentForm({ 
-      method: 'Pago Móvil', 
-      inputAmount: '', 
-      inputCurrency: 'BS', 
-      customBcvRate: bcvRate, // Seteamos la tasa actual por defecto
-      reference: '', 
-      bank: VENEZUELAN_BANKS[0], 
-      phone: '', 
-      accountName: '', 
-      notes: '' 
+      method: 'Pago Móvil', inputAmount: '', inputCurrency: 'BS', customBcvRate: bcvRate, 
+      reference: '', bank: VENEZUELAN_BANKS[0], phone: '', accountName: '', notes: '' 
     });
     setPaymentModal({ isOpen: true, orderId: order.id });
   };
@@ -897,31 +862,17 @@ function AdminOrders({ orders, bcvRate, products }) {
     const order = orders.find((o) => o.id === paymentModal.orderId);
     if (!order) return;
 
-    // Calcular el monto en dólares usando la tasa seleccionada por el admin
     const rateToUse = Number(paymentForm.customBcvRate) || bcvRate;
-    const amountUSDToSave = paymentForm.inputCurrency === 'BS' 
-      ? Number(paymentForm.inputAmount) / rateToUse 
-      : Number(paymentForm.inputAmount);
+    const amountUSDToSave = paymentForm.inputCurrency === 'BS' ? Number(paymentForm.inputAmount) / rateToUse : Number(paymentForm.inputAmount);
 
     if (!amountUSDToSave || amountUSDToSave <= 0) return alert("Ingresa un monto válido");
 
     let detailsStr = '';
-    if (['Pago Móvil', 'Transferencia Bs'].includes(paymentForm.method)) {
-      detailsStr = `Banco: ${paymentForm.bank} - Tlf: ${paymentForm.phone}`;
-    } else if (['Zelle', 'Zinli', 'Binance'].includes(paymentForm.method)) {
-      detailsStr = `Titular/Cuenta: ${paymentForm.accountName}`;
-    } else if (paymentForm.method === 'Efectivo Divisas') {
-      detailsStr = paymentForm.notes ? `Notas: ${paymentForm.notes}` : '';
-    }
+    if (['Pago Móvil', 'Transferencia Bs'].includes(paymentForm.method)) detailsStr = `Banco: ${paymentForm.bank} - Tlf: ${paymentForm.phone}`;
+    else if (['Zelle', 'Zinli', 'Binance'].includes(paymentForm.method)) detailsStr = `Titular/Cuenta: ${paymentForm.accountName}`;
+    else if (paymentForm.method === 'Efectivo Divisas') detailsStr = paymentForm.notes ? `Notas: ${paymentForm.notes}` : '';
 
-    const newPayment = {
-      method: paymentForm.method,
-      reference: paymentForm.reference || '',
-      amountUSD: amountUSDToSave,
-      details: detailsStr,
-      date: new Date().toISOString()
-    };
-    
+    const newPayment = { method: paymentForm.method, reference: paymentForm.reference || '', amountUSD: amountUSDToSave, details: detailsStr, date: new Date().toISOString() };
     const updatedPayments = [...(order.payments || []), newPayment];
     const totalPaid = updatedPayments.reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
     const orderTotal = Number(order.totalUSD) || 0;
@@ -941,23 +892,42 @@ function AdminOrders({ orders, bcvRate, products }) {
 
     const updatedPayments = [...(order.payments || [])];
     updatedPayments.splice(paymentIndex, 1);
-
     const totalPaid = updatedPayments.reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
     const orderTotal = Number(order.totalUSD) || 0;
 
     let newStatus = order.status;
-    if (updatedPayments.length === 0) {
-      newStatus = 'Pendiente';
-    } else if (totalPaid >= orderTotal) {
-      newStatus = 'Pagado';
-    } else {
-      newStatus = 'Abonado';
-    }
+    if (updatedPayments.length === 0) newStatus = 'Pendiente';
+    else if (totalPaid >= orderTotal) newStatus = 'Pagado';
+    else newStatus = 'Abonado';
 
-    await updateDoc(doc(db, 'orders', order.id), {
-      payments: updatedPayments,
-      status: newStatus
+    await updateDoc(doc(db, 'orders', order.id), { payments: updatedPayments, status: newStatus });
+  };
+
+  const openCreateModal = () => {
+    setEditOrderId(null);
+    setManualOrder({ senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] });
+    setIsOrderModalOpen(true);
+  };
+
+  const openEditModal = (order) => {
+    setEditOrderId(order.id);
+    setManualOrder({
+      senderName: order.senderName || order.customerName || '',
+      senderPhone: order.senderPhone || order.phone || '',
+      recipientName: order.recipientName || '',
+      recipientPhone: order.recipientPhone || '',
+      deliveryAddress: order.deliveryAddress || order.address || '',
+      deliveryDate: order.deliveryDate || '',
+      deliveryTimeSlot: order.deliveryTimeSlot || 'Mañana (8:00 AM - 12:00 PM)',
+      dedication: order.dedication || '',
+      items: order.items || []
     });
+    setIsOrderModalOpen(true);
+  };
+
+  const closeOrderModal = () => {
+    setIsOrderModalOpen(false);
+    setEditOrderId(null);
   };
 
   const handleAddManualItem = () => {
@@ -980,13 +950,12 @@ function AdminOrders({ orders, bcvRate, products }) {
     setManualOrder({ ...manualOrder, items: newItems });
   };
 
-  const handleCreateManualOrder = async (e) => {
+  const handleSaveOrder = async (e) => {
     e.preventDefault();
     if (manualOrder.items.length === 0) return alert("Debes agregar al menos un producto.");
     const totalUSD = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
     
-    await addDoc(collection(db, 'orders'), {
-      displayId: `PED-M${Math.floor(Math.random() * 10000)}`,
+    const orderData = {
       senderName: manualOrder.senderName,
       senderPhone: manualOrder.senderPhone,
       recipientName: manualOrder.recipientName,
@@ -997,20 +966,33 @@ function AdminOrders({ orders, bcvRate, products }) {
       dedication: manualOrder.dedication,
       items: manualOrder.items,
       totalUSD: totalUSD,
-      status: 'Pendiente',
-      payments: [],
-      date: new Date().toISOString(),
-      // Mantenemos campos legacy por compatibilidad con visualización de tablas antiguas
       customerName: manualOrder.senderName,
       phone: manualOrder.senderPhone,
       address: manualOrder.deliveryAddress
-    });
+    };
+
+    if (editOrderId) {
+      // Recalcular estado por si el total cambió por edición de productos
+      const existingOrder = orders.find(o => o.id === editOrderId);
+      const totalPaid = (existingOrder.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
+      let newStatus = existingOrder.status;
+
+      if (totalPaid >= totalUSD && totalUSD > 0) newStatus = 'Pagado';
+      else if (totalPaid > 0 && totalPaid < totalUSD) newStatus = 'Abonado';
+      else if (totalPaid === 0 && newStatus === 'Pagado') newStatus = 'Pendiente';
+
+      await updateDoc(doc(db, 'orders', editOrderId), { ...orderData, status: newStatus });
+    } else {
+      await addDoc(collection(db, 'orders'), {
+        ...orderData,
+        displayId: `PED-M${Math.floor(Math.random() * 10000)}`,
+        status: 'Pendiente',
+        payments: [],
+        date: new Date().toISOString()
+      });
+    }
     
-    setIsManualOrderOpen(false);
-    setManualOrder({ 
-      senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', 
-      deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] 
-    });
+    closeOrderModal();
   };
 
   const getStatusColor = (status) => {
@@ -1026,13 +1008,8 @@ function AdminOrders({ orders, bcvRate, products }) {
   };
 
   const filteredOrders = orders.filter((order) => {
-    const matchesSearch = 
-      String(order.displayId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(order.customerName || order.senderName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(order.phone || order.senderPhone || '').includes(searchTerm);
-      
+    const matchesSearch = String(order.displayId || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(order.customerName || order.senderName || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(order.phone || order.senderPhone || '').includes(searchTerm);
     const matchesStatus = statusFilter === 'Todos' || order.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
 
@@ -1043,7 +1020,7 @@ function AdminOrders({ orders, bcvRate, products }) {
           <h2 className="text-2xl font-bold text-gray-800">Control de Pedidos</h2>
           <p className="text-stone-500">Gestiona entregas y cobros</p>
         </div>
-        <button onClick={() => setIsManualOrderOpen(true)} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg hover:shadow-xl text-sm">
+        <button onClick={openCreateModal} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg hover:shadow-xl text-sm">
           <Plus className="w-5 h-5" /> Nuevo Pedido Manual
         </button>
       </div>
@@ -1089,10 +1066,7 @@ function AdminOrders({ orders, bcvRate, products }) {
               const totalPaid = (order.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
               const orderTotal = Number(order.totalUSD) || 0;
               const balance = orderTotal - totalPaid;
-              // Safe date rendering
-              const dateStr = order.date && !isNaN(new Date(order.date).getTime()) 
-                ? new Date(order.date).toLocaleDateString() 
-                : 'N/A';
+              const dateStr = order.date && !isNaN(new Date(order.date).getTime()) ? new Date(order.date).toLocaleDateString() : 'N/A';
               
               return (
               <tr key={order.id} className="hover:bg-stone-50/50 transition-colors">
@@ -1138,6 +1112,11 @@ function AdminOrders({ orders, bcvRate, products }) {
                     <option value="Cancelado">Cancelado</option>
                   </select>
                   
+                  {/* Botón de Editar Pedido */}
+                  <button onClick={() => openEditModal(order)} className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors shadow-sm" title="Editar Pedido">
+                    <Edit className="w-5 h-5" />
+                  </button>
+
                   <button onClick={() => setReceiptModal({ isOpen: true, order })} className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors shadow-sm" title="Imprimir Nota">
                     <Printer className="w-5 h-5" />
                   </button>
@@ -1230,35 +1209,25 @@ function AdminOrders({ orders, bcvRate, products }) {
       {paymentModal.isOpen && orders.find((o) => o.id === paymentModal.orderId) && (() => {
         const activeOrder = orders.find((o) => o.id === paymentModal.orderId);
         
-        // Cálculos de saldo inicial
         const orderTotalUSD = Number(activeOrder.totalUSD) || 0;
         const previouslyPaidUSD = (activeOrder.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
         const initialBalanceUSD = Math.max(0, orderTotalUSD - previouslyPaidUSD);
         
-        // Calculamos usando la tasa personalizada del formulario, o la global como fallback
         const rateToUse = Number(paymentForm.customBcvRate) || bcvRate;
-        const inputAmountConvertedUSD = paymentForm.inputCurrency === 'BS' 
-          ? (Number(paymentForm.inputAmount) || 0) / rateToUse 
-          : (Number(paymentForm.inputAmount) || 0);
+        const inputAmountConvertedUSD = paymentForm.inputCurrency === 'BS' ? (Number(paymentForm.inputAmount) || 0) / rateToUse : (Number(paymentForm.inputAmount) || 0);
 
         const newRemainingUSD = Math.max(0, initialBalanceUSD - inputAmountConvertedUSD);
-        const maxInputAllowed = paymentForm.inputCurrency === 'BS' 
-          ? (initialBalanceUSD * rateToUse).toFixed(2) 
-          : initialBalanceUSD.toFixed(2);
+        const maxInputAllowed = paymentForm.inputCurrency === 'BS' ? (initialBalanceUSD * rateToUse).toFixed(2) : initialBalanceUSD.toFixed(2);
 
         return (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-            
-            {/* Header */}
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 shrink-0">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-600"/> Registrar Pago</h3>
               <button onClick={() => setPaymentModal({ isOpen: false, orderId: null })} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full shadow-sm"><X className="w-5 h-5" /></button>
             </div>
             
             <div className="p-6 overflow-y-auto">
-              
-              {/* Calculadora en tiempo real */}
               <div className="grid grid-cols-2 gap-4 mb-6 bg-stone-100 p-4 rounded-2xl border border-stone-200">
                 <div>
                   <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Deuda Actual</p>
@@ -1267,29 +1236,20 @@ function AdminOrders({ orders, bcvRate, products }) {
                 </div>
                 <div className="text-right border-l border-stone-300 pl-4">
                   <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Quedaría en</p>
-                  <p className={`text-2xl font-black ${newRemainingUSD <= 0.01 ? 'text-green-500' : 'text-orange-500'}`}>
-                    ${newRemainingUSD.toFixed(2)}
-                  </p>
+                  <p className={`text-2xl font-black ${newRemainingUSD <= 0.01 ? 'text-green-500' : 'text-orange-500'}`}>${newRemainingUSD.toFixed(2)}</p>
                   <p className="text-xs font-bold text-stone-400">Bs. {(newRemainingUSD * rateToUse).toFixed(2)}</p>
                 </div>
               </div>
               
               {initialBalanceUSD > 0 && (
               <form id="admin-payment-form" onSubmit={handleRegisterPayment} className="space-y-4">
-                
-                {/* 1. Método */}
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Método</label>
                   <select required value={paymentForm.method} 
                     onChange={e => {
                       const newMethod = e.target.value;
                       const isBsMethod = ['Pago Móvil', 'Transferencia Bs'].includes(newMethod);
-                      setPaymentForm({
-                        ...paymentForm, 
-                        method: newMethod,
-                        inputCurrency: isBsMethod ? 'BS' : 'USD', // Auto-switch moneda por UX
-                        inputAmount: ''
-                      });
+                      setPaymentForm({...paymentForm, method: newMethod, inputCurrency: isBsMethod ? 'BS' : 'USD', inputAmount: ''});
                     }} 
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50 font-medium">
                     <option value="Pago Móvil">Pago Móvil (Bs)</option>
@@ -1301,7 +1261,6 @@ function AdminOrders({ orders, bcvRate, products }) {
                   </select>
                 </div>
 
-                {/* 2. Monto con Alternador de Moneda */}
                 <div className="bg-stone-50 border border-stone-200 p-3 rounded-2xl">
                   <div className="flex bg-stone-200 p-1 rounded-xl mb-3">
                     <button type="button" onClick={()=>setPaymentForm({...paymentForm, inputCurrency: 'USD', inputAmount: ''})} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${paymentForm.inputCurrency==='USD'?'bg-white shadow-sm text-green-700':'text-stone-500 hover:bg-stone-100'}`}>Ingresar en Divisas ($)</button>
@@ -1316,31 +1275,23 @@ function AdminOrders({ orders, bcvRate, products }) {
                     />
                   </div>
                   
-                  {/* Tasa Editable por el Administrador */}
                   {paymentForm.inputCurrency === 'BS' && (
                     <div className="mt-3 pt-3 border-t border-stone-200">
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tasa BCV Aplicada para este cobro</label>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tasa BCV Aplicada</label>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-stone-500">Bs.</span>
                         <input type="number" step="0.01" value={paymentForm.customBcvRate} onChange={e => setPaymentForm({...paymentForm, customBcvRate: e.target.value})} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg outline-none text-xs bg-white text-stone-700 font-bold focus:border-blue-500" />
-                        <button type="button" onClick={()=>setPaymentForm({...paymentForm, customBcvRate: bcvRate})} className="text-[10px] bg-stone-200 hover:bg-stone-300 px-2 py-1.5 rounded-lg font-bold text-stone-600 shrink-0">Usar Tasa de Hoy</button>
+                        <button type="button" onClick={()=>setPaymentForm({...paymentForm, customBcvRate: bcvRate})} className="text-[10px] bg-stone-200 hover:bg-stone-300 px-2 py-1.5 rounded-lg font-bold text-stone-600 shrink-0">Usar Tasa Actual</button>
                       </div>
                     </div>
                   )}
-
-                  {/* Feedback visual de conversión cruzada */}
                   {paymentForm.inputAmount > 0 && (
                     <div className="mt-3 text-center text-[11px] font-bold text-stone-500 bg-white py-1.5 rounded-lg border border-stone-100 shadow-sm">
-                      {paymentForm.inputCurrency === 'BS' 
-                        ? `Al guardarse, el sistema lo registrará como $${inputAmountConvertedUSD.toFixed(2)}`
-                        : `El cliente debería enviarte Bs. ${(inputAmountConvertedUSD * rateToUse).toFixed(2)}`}
+                      {paymentForm.inputCurrency === 'BS' ? `Al guardarse, se registrará como $${inputAmountConvertedUSD.toFixed(2)}` : `El cliente debería enviar Bs. ${(inputAmountConvertedUSD * rateToUse).toFixed(2)}`}
                     </div>
                   )}
                 </div>
 
-                {/* --- CAMPOS DINÁMICOS SEGÚN EL MÉTODO DE PAGO --- */}
-
-                {/* Formulario: Bolívares (Pago Móvil / Transferencia) */}
                 {['Pago Móvil', 'Transferencia Bs'].includes(paymentForm.method) && (
                   <div className="space-y-4 pt-2 border-t border-stone-100">
                     <div className="grid grid-cols-2 gap-4">
@@ -1351,46 +1302,40 @@ function AdminOrders({ orders, bcvRate, products }) {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Teléfono Emisor</label>
-                        <input required type="tel" value={paymentForm.phone} onChange={e => setPaymentForm({...paymentForm, phone: e.target.value})} placeholder="Ej: 04141234567" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50" />
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Tlf Emisor</label>
+                        <input required type="tel" value={paymentForm.phone} onChange={e => setPaymentForm({...paymentForm, phone: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50" />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Nº de Referencia (Últimos 4/6 dígitos)</label>
-                      <input required type="text" value={paymentForm.reference} onChange={e => setPaymentForm({...paymentForm, reference: e.target.value})} placeholder="Ej: 123456" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
+                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Nº de Referencia</label>
+                      <input required type="text" value={paymentForm.reference} onChange={e => setPaymentForm({...paymentForm, reference: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
                     </div>
                   </div>
                 )}
-
-                {/* Formulario: Plataformas USD Digital (Zelle, Zinli, Binance) */}
                 {['Zelle', 'Zinli', 'Binance'].includes(paymentForm.method) && (
                   <div className="space-y-4 pt-2 border-t border-stone-100">
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Titular / Correo de la Cuenta</label>
-                      <input required type="text" value={paymentForm.accountName} onChange={e => setPaymentForm({...paymentForm, accountName: e.target.value})} placeholder={paymentForm.method === 'Binance' ? "Ej: PayID o Email" : "Ej: Maria Perez / maria@gmail.com"} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
+                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Titular / Cuenta</label>
+                      <input required type="text" value={paymentForm.accountName} onChange={e => setPaymentForm({...paymentForm, accountName: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Referencia / Confirmación</label>
-                      <input required type="text" value={paymentForm.reference} onChange={e => setPaymentForm({...paymentForm, reference: e.target.value})} placeholder="Código de confirmación" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
+                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Referencia</label>
+                      <input required type="text" value={paymentForm.reference} onChange={e => setPaymentForm({...paymentForm, reference: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
                     </div>
                   </div>
                 )}
-
-                {/* Formulario: Efectivo */}
                 {paymentForm.method === 'Efectivo Divisas' && (
                   <div className="space-y-4 pt-2 border-t border-stone-100">
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Denominaciones / Notas (Opcional)</label>
-                      <input type="text" value={paymentForm.notes} onChange={e => setPaymentForm({...paymentForm, notes: e.target.value})} placeholder="Ej: 1 billete de $20 y 1 de $10" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
+                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Notas</label>
+                      <input type="text" value={paymentForm.notes} onChange={e => setPaymentForm({...paymentForm, notes: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
                     </div>
                   </div>
                 )}
-
               </form>
               )}
             </div>
             
-            {/* Footer Modal */}
             {initialBalanceUSD > 0 && (
             <div className="p-5 border-t border-stone-100 bg-white shrink-0">
               <button form="admin-payment-form" type="submit" className="w-full bg-[#25D366] hover:bg-[#1ebd5a] text-white font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm">
@@ -1405,7 +1350,6 @@ function AdminOrders({ orders, bcvRate, products }) {
 
       {/* --- MODAL PARA VER Y ELIMINAR PAGOS --- */}
       {viewPaymentsModal.isOpen && (() => {
-        // Encontrar la orden actualizada en tiempo real
         const activeOrderView = orders.find(o => o.id === viewPaymentsModal.orderId);
         if (!activeOrderView) return null;
 
@@ -1429,14 +1373,7 @@ function AdminOrders({ orders, bcvRate, products }) {
                             <span className="font-black text-lg text-green-700 block leading-none">${Number(p.amountUSD).toFixed(2)}</span>
                             <span className="text-[10px] font-bold text-green-600">Bs. {(Number(p.amountUSD) * bcvRate).toFixed(2)}</span>
                           </div>
-                          {/* Botón de eliminar pago */}
-                          <button 
-                            onClick={() => handleDeletePayment(activeOrderView.id, i)} 
-                            title="Eliminar este pago"
-                            className="text-red-400 hover:text-red-600 bg-white hover:bg-red-50 p-1.5 rounded-lg transition-colors border border-red-100 shadow-sm"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <button onClick={() => handleDeletePayment(activeOrderView.id, i)} className="text-red-400 hover:text-red-600 bg-white hover:bg-red-50 p-1.5 rounded-lg transition-colors border border-red-100 shadow-sm"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </div>
                       {p.reference && <p className="text-xs text-stone-600 font-bold mt-1">Ref: {p.reference}</p>}
@@ -1454,61 +1391,63 @@ function AdminOrders({ orders, bcvRate, products }) {
         );
       })()}
       
-      {/* --- MODAL PARA CREAR PEDIDO MANUAL REFACTORIZADO --- */}
-      {isManualOrderOpen && (
+      {/* --- MODAL PARA CREAR / EDITAR PEDIDO --- */}
+      {isOrderModalOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 shrink-0">
-              <h3 className="text-lg font-bold text-gray-800">Crear Pedido Manual</h3>
-              <button onClick={() => setIsManualOrderOpen(false)} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                {editOrderId ? <><Edit className="w-5 h-5 text-blue-600"/> Editar Pedido</> : <><Plus className="w-5 h-5 text-red-600"/> Crear Pedido Manual</>}
+              </h3>
+              <button onClick={closeOrderModal} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
             </div>
             
             <div className="p-6 overflow-y-auto flex-grow bg-white">
-              <form id="manual-order-form" onSubmit={handleCreateManualOrder} className="space-y-6">
+              <form id="manual-order-form" onSubmit={handleSaveOrder} className="space-y-6">
                 
                 {/* 1. Quien Envía */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><User className="w-4 h-4"/> 1. Datos del Cliente (Quien Paga/Envía)</h4>
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-stone-700 uppercase tracking-wider"><User className="w-4 h-4"/> 1. Datos del Cliente (Quien Paga/Envía)</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input required type="text" placeholder="Nombre completo" value={manualOrder.senderName} onChange={e => setManualOrder({...manualOrder, senderName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
-                    <input type="tel" placeholder="Teléfono" value={manualOrder.senderPhone} onChange={e => setManualOrder({...manualOrder, senderPhone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
+                    <input required type="text" placeholder="Nombre completo" value={manualOrder.senderName} onChange={e => setManualOrder({...manualOrder, senderName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50" />
+                    <input type="tel" placeholder="Teléfono" value={manualOrder.senderPhone} onChange={e => setManualOrder({...manualOrder, senderPhone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50" />
                   </div>
                 </div>
 
                 {/* 2. Quien Recibe */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><Heart className="w-4 h-4"/> 2. Datos de quien recibe</h4>
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-stone-700 uppercase tracking-wider"><Heart className="w-4 h-4"/> 2. Datos de quien recibe</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input required type="text" placeholder="Nombre de quien recibe" value={manualOrder.recipientName} onChange={e => setManualOrder({...manualOrder, recipientName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
-                    <input required type="tel" placeholder="Teléfono del destinatario" value={manualOrder.recipientPhone} onChange={e => setManualOrder({...manualOrder, recipientPhone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
+                    <input required type="text" placeholder="Nombre de quien recibe" value={manualOrder.recipientName} onChange={e => setManualOrder({...manualOrder, recipientName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50" />
+                    <input required type="tel" placeholder="Teléfono del destinatario" value={manualOrder.recipientPhone} onChange={e => setManualOrder({...manualOrder, recipientPhone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50" />
                   </div>
                 </div>
 
                 {/* 3. Entrega */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
-                  <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={manualOrder.deliveryAddress} onChange={e => setManualOrder({...manualOrder, deliveryAddress: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50 resize-none" />
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-stone-700 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
+                  <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={manualOrder.deliveryAddress} onChange={e => setManualOrder({...manualOrder, deliveryAddress: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 resize-none" />
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">Fecha de Entrega</label>
-                      <input required type="date" value={manualOrder.deliveryDate} onChange={e => setManualOrder({...manualOrder, deliveryDate: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50 text-stone-700" />
+                      <input required type="date" value={manualOrder.deliveryDate} onChange={e => setManualOrder({...manualOrder, deliveryDate: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 text-stone-700" />
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">Bloque Horario</label>
-                      <select required value={manualOrder.deliveryTimeSlot} onChange={e => setManualOrder({...manualOrder, deliveryTimeSlot: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50 text-stone-700">
+                      <select required value={manualOrder.deliveryTimeSlot} onChange={e => setManualOrder({...manualOrder, deliveryTimeSlot: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 text-stone-700">
                         <option value="Mañana (8:00 AM - 12:00 PM)">☀️ Mañana (8am - 12pm)</option>
                         <option value="Tarde (1:00 PM - 5:00 PM)">🌤️ Tarde (1pm - 5pm)</option>
                       </select>
                     </div>
                   </div>
 
-                  <textarea placeholder="Dedicatoria (Opcional)" rows={2} value={manualOrder.dedication} onChange={e => setManualOrder({...manualOrder, dedication: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-red-50/50 italic resize-none" />
+                  <textarea placeholder="Dedicatoria (Opcional)" rows={2} value={manualOrder.dedication} onChange={e => setManualOrder({...manualOrder, dedication: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-blue-50/30 italic resize-none" />
                 </div>
 
                 {/* 4. Productos */}
                 <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200">
-                  <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"><ShoppingCart className="w-4 h-4"/> 4. Añadir Productos</h4>
+                  <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"><ShoppingCart className="w-4 h-4"/> 4. Añadir / Editar Productos</h4>
                   <div className="flex flex-col sm:flex-row gap-3 mb-2 items-end">
                     <div className="flex-1 w-full">
                       <select value={manualProduct} onChange={e => setManualProduct(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white font-medium">
@@ -1539,8 +1478,8 @@ function AdminOrders({ orders, bcvRate, products }) {
               </form>
             </div>
             <div className="p-5 border-t border-stone-100 bg-white shrink-0">
-              <button form="manual-order-form" type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg text-sm flex justify-center items-center gap-2">
-                Generar Pedido <ArrowUpRight className="w-5 h-5"/>
+              <button form="manual-order-form" type="submit" className={`w-full text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg text-sm flex justify-center items-center gap-2 ${editOrderId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}>
+                {editOrderId ? <><Save className="w-5 h-5"/> Guardar Cambios</> : <><ArrowUpRight className="w-5 h-5"/> Generar Pedido</>}
               </button>
             </div>
           </div>
