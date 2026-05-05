@@ -100,7 +100,6 @@ export default function App() {
     let unsubOrders = () => {};
     if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
-        // Blindaje extra en el ordenamiento de fechas para evitar pantallas negras
         const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
           const timeA = a.date && !isNaN(new Date(a.date).getTime()) ? new Date(a.date).getTime() : 0;
           const timeB = b.date && !isNaN(new Date(b.date).getTime()) ? new Date(b.date).getTime() : 0;
@@ -415,18 +414,17 @@ function AdminKPIs({ orders, bcvRate }) {
   const monthOrders = validOrders.filter((o) => {
     if(!o.date) return false;
     const d = new Date(o.date);
-    if(isNaN(d.getTime())) return false; // Seguro
+    if(isNaN(d.getTime())) return false;
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
 
   const todayOrders = validOrders.filter((o) => {
     if(!o.date) return false;
     const d = new Date(o.date);
-    if(isNaN(d.getTime())) return false; // Seguro
+    if(isNaN(d.getTime())) return false;
     return d.toLocaleDateString() === todayStr;
   });
 
-  // Number() garantiza que nulos/indefinidos devuelvan 0 sin romper React
   const monthSalesUSD = monthOrders.reduce((sum, o) => sum + (Number(o.totalUSD) || 0), 0);
   const todaySalesUSD = todayOrders.reduce((sum, o) => sum + (Number(o.totalUSD) || 0), 0);
   const totalHistóricoUSD = validOrders.reduce((sum, o) => sum + (Number(o.totalUSD) || 0), 0);
@@ -616,11 +614,12 @@ function AdminOrders({ orders, bcvRate, products }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
 
-  // Modal Pago Refactorizado
+  // Modal Pago con soporte Multimoneda
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null });
   const [paymentForm, setPaymentForm] = useState({ 
     method: 'Pago Móvil', 
-    amountUSD: '', 
+    inputAmount: '',
+    inputCurrency: 'BS', // 'USD' o 'BS'
     reference: '', 
     bank: VENEZUELAN_BANKS[0], 
     phone: '',
@@ -628,7 +627,7 @@ function AdminOrders({ orders, bcvRate, products }) {
     notes: '' 
   });
   
-  const [viewPaymentsModal, setViewPaymentsModal] = useState({ isOpen: false, order: null });
+  const [viewPaymentsModal, setViewPaymentsModal] = useState({ isOpen: false, orderId: null });
   const [receiptModal, setReceiptModal] = useState({ isOpen: false, order: null });
 
   const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
@@ -643,7 +642,8 @@ function AdminOrders({ orders, bcvRate, products }) {
   const openPaymentModal = (order) => {
     setPaymentForm({ 
       method: 'Pago Móvil', 
-      amountUSD: '', 
+      inputAmount: '', 
+      inputCurrency: 'BS', // Por defecto arranca en Bs porque arranca en Pago Móvil
       reference: '', 
       bank: VENEZUELAN_BANKS[0], 
       phone: '', 
@@ -658,7 +658,13 @@ function AdminOrders({ orders, bcvRate, products }) {
     const order = orders.find((o) => o.id === paymentModal.orderId);
     if (!order) return;
 
-    // Validación según método
+    // Calcular el monto en dólares a guardar según la moneda seleccionada
+    const amountUSDToSave = paymentForm.inputCurrency === 'BS' 
+      ? Number(paymentForm.inputAmount) / bcvRate 
+      : Number(paymentForm.inputAmount);
+
+    if (!amountUSDToSave || amountUSDToSave <= 0) return alert("Ingresa un monto válido");
+
     let detailsStr = '';
     if (['Pago Móvil', 'Transferencia Bs'].includes(paymentForm.method)) {
       detailsStr = `Banco: ${paymentForm.bank} - Tlf: ${paymentForm.phone}`;
@@ -671,7 +677,7 @@ function AdminOrders({ orders, bcvRate, products }) {
     const newPayment = {
       method: paymentForm.method,
       reference: paymentForm.reference || '',
-      amountUSD: Number(paymentForm.amountUSD),
+      amountUSD: amountUSDToSave,
       details: detailsStr,
       date: new Date().toISOString()
     };
@@ -686,6 +692,32 @@ function AdminOrders({ orders, bcvRate, products }) {
 
     await updateDoc(doc(db, 'orders', order.id), { status: newStatus, payments: updatedPayments });
     setPaymentModal({ isOpen: false, orderId: null });
+  };
+
+  const handleDeletePayment = async (orderId, paymentIndex) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este pago? Esta acción no se puede deshacer.")) return;
+
+    const updatedPayments = [...(order.payments || [])];
+    updatedPayments.splice(paymentIndex, 1);
+
+    const totalPaid = updatedPayments.reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
+    const orderTotal = Number(order.totalUSD) || 0;
+
+    let newStatus = order.status;
+    if (updatedPayments.length === 0) {
+      newStatus = 'Pendiente';
+    } else if (totalPaid >= orderTotal) {
+      newStatus = 'Pagado';
+    } else {
+      newStatus = 'Abonado';
+    }
+
+    await updateDoc(doc(db, 'orders', order.id), {
+      payments: updatedPayments,
+      status: newStatus
+    });
   };
 
   const handleAddManualItem = () => {
@@ -828,7 +860,7 @@ function AdminOrders({ orders, bcvRate, products }) {
                     <div className="mb-1">
                       <span className="text-green-600 font-black">${totalPaid.toFixed(2)} Pagado</span>
                       {balance > 0 && <span className="text-red-500 ml-2 text-xs font-bold bg-red-50 px-1 rounded block mt-1 w-max">Deuda: ${balance.toFixed(2)}</span>}
-                      <button onClick={() => setViewPaymentsModal({ isOpen: true, order })} className="text-[10px] font-bold text-blue-600 hover:underline mt-1">Ver pagos</button>
+                      <button onClick={() => setViewPaymentsModal({ isOpen: true, orderId: order.id })} className="text-[10px] font-bold text-blue-600 hover:underline mt-1">Ver/Borrar pagos</button>
                     </div>
                   ) : (
                     <span className="text-orange-500 font-bold text-xs bg-orange-50 px-2 py-1 rounded">Por Cobrar</span>
@@ -950,9 +982,15 @@ function AdminOrders({ orders, bcvRate, products }) {
         const previouslyPaidUSD = (activeOrder.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
         const initialBalanceUSD = Math.max(0, orderTotalUSD - previouslyPaidUSD);
         
-        // Cálculos en tiempo real según lo que escribe el admin
-        const inputAmountUSD = Number(paymentForm.amountUSD) || 0;
-        const newRemainingUSD = Math.max(0, initialBalanceUSD - inputAmountUSD);
+        // Cálculos en tiempo real multimoneda
+        const inputAmountConvertedUSD = paymentForm.inputCurrency === 'BS' 
+          ? (Number(paymentForm.inputAmount) || 0) / bcvRate 
+          : (Number(paymentForm.inputAmount) || 0);
+
+        const newRemainingUSD = Math.max(0, initialBalanceUSD - inputAmountConvertedUSD);
+        const maxInputAllowed = paymentForm.inputCurrency === 'BS' 
+          ? (initialBalanceUSD * bcvRate).toFixed(2) 
+          : initialBalanceUSD.toFixed(2);
 
         return (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
@@ -975,7 +1013,7 @@ function AdminOrders({ orders, bcvRate, products }) {
                 </div>
                 <div className="text-right border-l border-stone-300 pl-4">
                   <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Quedaría en</p>
-                  <p className={`text-2xl font-black ${newRemainingUSD === 0 ? 'text-green-500' : 'text-orange-500'}`}>
+                  <p className={`text-2xl font-black ${newRemainingUSD <= 0.01 ? 'text-green-500' : 'text-orange-500'}`}>
                     ${newRemainingUSD.toFixed(2)}
                   </p>
                   <p className="text-xs font-bold text-stone-400">Bs. {(newRemainingUSD * bcvRate).toFixed(2)}</p>
@@ -985,34 +1023,54 @@ function AdminOrders({ orders, bcvRate, products }) {
               {initialBalanceUSD > 0 && (
               <form id="admin-payment-form" onSubmit={handleRegisterPayment} className="space-y-4">
                 
-                {/* 1. Método y Monto */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Método</label>
-                    <select required value={paymentForm.method} onChange={e => setPaymentForm({...paymentForm, method: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50 font-medium">
-                      <option value="Pago Móvil">Pago Móvil (Bs)</option>
-                      <option value="Transferencia Bs">Transferencia Bs</option>
-                      <option value="Zelle">Zelle (USD)</option>
-                      <option value="Zinli">Zinli (USD)</option>
-                      <option value="Binance">Binance Pay (USDT)</option>
-                      <option value="Efectivo Divisas">Efectivo Divisas</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Monto a Pagar (USD)</label>
-                    <input required type="number" step="0.01" max={initialBalanceUSD} value={paymentForm.amountUSD} onChange={e => setPaymentForm({...paymentForm, amountUSD: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-white font-black text-green-700" placeholder={`Max $${initialBalanceUSD}`} />
-                  </div>
+                {/* 1. Método */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Método</label>
+                  <select required value={paymentForm.method} 
+                    onChange={e => {
+                      const newMethod = e.target.value;
+                      const isBsMethod = ['Pago Móvil', 'Transferencia Bs'].includes(newMethod);
+                      setPaymentForm({
+                        ...paymentForm, 
+                        method: newMethod,
+                        inputCurrency: isBsMethod ? 'BS' : 'USD', // Auto-switch moneda por UX
+                        inputAmount: ''
+                      });
+                    }} 
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50 font-medium">
+                    <option value="Pago Móvil">Pago Móvil (Bs)</option>
+                    <option value="Transferencia Bs">Transferencia Bs</option>
+                    <option value="Zelle">Zelle (USD)</option>
+                    <option value="Zinli">Zinli (USD)</option>
+                    <option value="Binance">Binance Pay (USDT)</option>
+                    <option value="Efectivo Divisas">Efectivo Divisas</option>
+                  </select>
                 </div>
-                
-                {/* Visualización de lo que el cliente debe enviar en Bs si paga en Divisas o Bs */}
-                {inputAmountUSD > 0 && (
-                  <div className="bg-blue-50 border border-blue-100 p-2.5 rounded-xl flex items-center justify-center gap-2">
-                    <Activity className="w-4 h-4 text-blue-500"/>
-                    <span className="text-xs font-bold text-blue-800">
-                      El cliente te está enviando: <span className="font-black text-blue-900">Bs. {(inputAmountUSD * bcvRate).toFixed(2)}</span>
-                    </span>
+
+                {/* 2. Monto con Alternador de Moneda */}
+                <div className="bg-stone-50 border border-stone-200 p-3 rounded-2xl">
+                  <div className="flex bg-stone-200 p-1 rounded-xl mb-3">
+                    <button type="button" onClick={()=>setPaymentForm({...paymentForm, inputCurrency: 'USD', inputAmount: ''})} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${paymentForm.inputCurrency==='USD'?'bg-white shadow-sm text-green-700':'text-stone-500 hover:bg-stone-100'}`}>Ingresar en Divisas ($)</button>
+                    <button type="button" onClick={()=>setPaymentForm({...paymentForm, inputCurrency: 'BS', inputAmount: ''})} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${paymentForm.inputCurrency==='BS'?'bg-white shadow-sm text-blue-700':'text-stone-500 hover:bg-stone-100'}`}>Ingresar en Bolívares (Bs)</button>
                   </div>
-                )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Monto a Pagar ({paymentForm.inputCurrency === 'USD' ? '$ USD' : 'Bs VES'})</label>
+                    <input required type="number" step="0.01" max={maxInputAllowed} value={paymentForm.inputAmount} onChange={e => setPaymentForm({...paymentForm, inputAmount: e.target.value})} 
+                      className={`w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none text-sm font-black transition-colors ${paymentForm.inputCurrency === 'USD' ? 'bg-white focus:ring-2 focus:ring-green-500 text-green-700' : 'bg-white focus:ring-2 focus:ring-blue-500 text-blue-700'}`} 
+                      placeholder={`Max ${paymentForm.inputCurrency === 'USD' ? '$' : 'Bs. '}${maxInputAllowed}`} 
+                    />
+                  </div>
+
+                  {/* Feedback visual de conversión cruzada */}
+                  {paymentForm.inputAmount > 0 && (
+                    <div className="mt-2 text-center text-[11px] font-bold text-stone-500 bg-white py-1 rounded-lg border border-stone-100">
+                      {paymentForm.inputCurrency === 'BS' 
+                        ? `Al guardarse, el sistema lo registrará como $${inputAmountConvertedUSD.toFixed(2)}`
+                        : `El cliente debería enviarte Bs. ${(inputAmountConvertedUSD * bcvRate).toFixed(2)}`}
+                    </div>
+                  )}
+                </div>
 
                 {/* --- CAMPOS DINÁMICOS SEGÚN EL MÉTODO DE PAGO --- */}
 
@@ -1079,35 +1137,56 @@ function AdminOrders({ orders, bcvRate, products }) {
         );
       })()}
 
-      {viewPaymentsModal.isOpen && (
+      {/* --- MODAL PARA VER Y ELIMINAR PAGOS --- */}
+      {viewPaymentsModal.isOpen && (() => {
+        // Encontrar la orden actualizada en tiempo real
+        const activeOrderView = orders.find(o => o.id === viewPaymentsModal.orderId);
+        if (!activeOrderView) return null;
+
+        return (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50">
               <h3 className="text-lg font-bold text-gray-800">Historial de Pagos</h3>
-              <button onClick={() => setViewPaymentsModal({ isOpen: false, order: null })} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
+              <button onClick={() => setViewPaymentsModal({ isOpen: false, orderId: null })} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-5 overflow-y-auto">
-              <div className="space-y-3">
-                {viewPaymentsModal.order.payments?.map((p, i) => (
-                  <div key={i} className="p-4 border border-green-200 rounded-2xl bg-green-50 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-bold text-sm text-green-900 bg-green-200 px-2 py-0.5 rounded-lg">{p.method}</span>
-                      <div className="text-right">
-                        <span className="font-black text-lg text-green-700 block leading-none">${Number(p.amountUSD).toFixed(2)}</span>
-                        <span className="text-[10px] font-bold text-green-600">Bs. {(Number(p.amountUSD) * bcvRate).toFixed(2)}</span>
+            <div className="p-5 overflow-y-auto max-h-[70vh]">
+              {activeOrderView.payments?.length > 0 ? (
+                <div className="space-y-3">
+                  {activeOrderView.payments.map((p, i) => (
+                    <div key={i} className="p-4 border border-green-200 rounded-2xl bg-green-50 shadow-sm relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold text-sm text-green-900 bg-green-200 px-2 py-0.5 rounded-lg">{p.method}</span>
+                        <div className="flex items-start gap-3 text-right">
+                          <div>
+                            <span className="font-black text-lg text-green-700 block leading-none">${Number(p.amountUSD).toFixed(2)}</span>
+                            <span className="text-[10px] font-bold text-green-600">Bs. {(Number(p.amountUSD) * bcvRate).toFixed(2)}</span>
+                          </div>
+                          {/* Botón de eliminar pago */}
+                          <button 
+                            onClick={() => handleDeletePayment(activeOrderView.id, i)} 
+                            title="Eliminar este pago"
+                            className="text-red-400 hover:text-red-600 bg-white hover:bg-red-50 p-1.5 rounded-lg transition-colors border border-red-100 shadow-sm"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
+                      {p.reference && <p className="text-xs text-stone-600 font-bold mt-1">Ref: {p.reference}</p>}
+                      {p.details && <p className="text-xs text-stone-500 mt-0.5">{p.details}</p>}
+                      <p className="text-[10px] text-stone-400 mt-2 font-medium uppercase tracking-wider">{p.date ? new Date(p.date).toLocaleString() : 'N/A'}</p>
                     </div>
-                    {p.reference && <p className="text-xs text-stone-600 font-bold mt-1">Ref: {p.reference}</p>}
-                    {p.details && <p className="text-xs text-stone-500 mt-0.5">{p.details}</p>}
-                    <p className="text-[10px] text-stone-400 mt-2 font-medium uppercase tracking-wider">{p.date ? new Date(p.date).toLocaleString() : 'N/A'}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-stone-500 text-sm font-medium py-8">Este pedido no tiene pagos registrados.</p>
+              )}
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
       
       {isManualOrderOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
