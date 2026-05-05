@@ -793,54 +793,97 @@ function AdminKPIs({ orders, bcvRate }) {
   );
 }
 
+// --- MÓDULO REDISEÑADO Y BLINDADO: MIS CLIENTES ---
 function AdminCustomers({ orders }) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const clientMap = new Map();
-  
-  orders.forEach((order) => {
-    if(order.status === 'Cancelado') return;
+  // 1. Proteger la inicialización usando manejo de errores robusto
+  let filteredCustomers = [];
+  try {
+    const clientMap = new Map();
+    
+    // Iterar sobre los pedidos asegurándose de que 'orders' sea un arreglo
+    (orders || []).forEach((order) => {
+      // Ignorar si el pedido fue cancelado o si el objeto está corrupto
+      if (!order || order.status === 'Cancelado') return;
 
-    const name = String(order.senderName || order.customerName || 'Cliente Anónimo');
-    const phone = String(order.senderPhone || order.phone || 'Sin Teléfono');
-    
-    const key = phone !== 'Sin Teléfono' ? phone : name.toLowerCase();
+      // Usar String() evita que caiga si viene un objeto o valor inesperado
+      const name = String(order.senderName || order.customerName || 'Cliente Anónimo').trim();
+      const phone = String(order.senderPhone || order.phone || 'Sin Teléfono').trim();
+      
+      const key = phone !== 'Sin Teléfono' ? phone : name.toLowerCase();
 
-    if (!clientMap.has(key)) {
-      clientMap.set(key, { 
-        name, 
-        phone, 
-        totalOrders: 0, 
-        totalSpent: 0, 
-        lastOrder: order.date 
-      });
-    }
-    
-    const client = clientMap.get(key);
-    client.totalOrders += 1;
-    client.totalSpent += (Number(order.totalUSD) || 0);
-    
-    if (order.date && client.lastOrder) {
-      if (new Date(order.date) > new Date(client.lastOrder)) {
-        client.lastOrder = order.date;
-        client.name = name; 
+      if (!clientMap.has(key)) {
+        clientMap.set(key, { 
+          name: name, 
+          phone: phone, 
+          totalOrders: 0, 
+          totalSpent: 0, 
+          lastOrder: order.date || null
+        });
       }
+      
+      const client = clientMap.get(key);
+      if (client) {
+        client.totalOrders += 1;
+        client.totalSpent += (Number(order.totalUSD) || 0);
+        
+        // Calcular de forma segura cuál es el último pedido
+        if (order.date && client.lastOrder) {
+          const newDate = new Date(order.date);
+          const oldDate = new Date(client.lastOrder);
+          
+          // Solo comparar si ambas fechas son válidas (evita colapso de React)
+          if (!isNaN(newDate.getTime()) && !isNaN(oldDate.getTime())) {
+            if (newDate > oldDate) {
+              client.lastOrder = order.date;
+              client.name = name; 
+            }
+          }
+        } else if (order.date && !client.lastOrder) {
+          client.lastOrder = order.date;
+        }
+      }
+    });
+
+    // 2. Convertir el mapa a un array y ordenar (Asegurando que no se rompa si totalSpent es NaN)
+    const allCustomers = Array.from(clientMap.values()).sort((a, b) => {
+      const spentA = Number(a.totalSpent) || 0;
+      const spentB = Number(b.totalSpent) || 0;
+      return spentB - spentA;
+    });
+
+    // 3. Aplicar el filtro de búsqueda de forma segura
+    filteredCustomers = allCustomers.filter(c => {
+      const safeName = String(c.name || '').toLowerCase();
+      const safePhone = String(c.phone || '').toLowerCase();
+      const term = String(searchTerm || '').toLowerCase();
+      return safeName.includes(term) || safePhone.includes(term);
+    });
+
+  } catch (error) {
+    console.error("Error al renderizar el directorio de clientes:", error);
+    // Si algo falla, dejamos la lista vacía para no romper la pantalla
+    filteredCustomers = [];
+  }
+
+  // Helper seguro para renderizar las fechas
+  const renderSafeDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const d = new Date(dateString);
+      return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+    } catch {
+      return 'N/A';
     }
-  });
-
-  const allCustomers = Array.from(clientMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
-
-  const filteredCustomers = allCustomers.filter(c => 
-    String(c.name).toLowerCase().includes(searchTerm.toLowerCase()) || 
-    String(c.phone).includes(searchTerm)
-  );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
-          <p className="text-stone-500 text-sm mt-1">Generado automáticamente según el historial de compras ({allCustomers.length} registrados)</p>
+          <p className="text-stone-500 text-sm mt-1">Generado automáticamente según el historial de compras</p>
         </div>
         
         <div className="relative w-full sm:w-64">
@@ -876,19 +919,19 @@ function AdminCustomers({ orders }) {
                   </td>
                   <td className="p-4 text-center">
                     <span className="bg-stone-100 text-stone-700 font-bold px-3 py-1 rounded-full text-xs">
-                      {client.totalOrders}
+                      {Number(client.totalOrders) || 0}
                     </span>
                   </td>
                   <td className="p-4">
-                    <p className="font-black text-green-600">${Number(client.totalSpent).toFixed(2)}</p>
+                    <p className="font-black text-green-600">${(Number(client.totalSpent) || 0).toFixed(2)}</p>
                   </td>
                   <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
-                    {client.lastOrder ? new Date(client.lastOrder).toLocaleDateString() : 'N/A'}
+                    {renderSafeDate(client.lastOrder)}
                   </td>
                   <td className="p-4 text-right">
-                    {client.phone !== 'Sin Teléfono' && (
+                    {client.phone && client.phone !== 'Sin Teléfono' && (
                       <a 
-                        href={`https://wa.me/${client.phone.replace(/\D/g,'')}`} 
+                        href={`https://wa.me/${String(client.phone).replace(/\D/g,'')}`} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 bg-[#25D366]/10 text-[#1ebd5a] hover:bg-[#25D366] hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
@@ -1154,7 +1197,15 @@ function AdminOrders({ orders, bcvRate, products }) {
               const totalPaid = (order.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
               const orderTotal = Number(order.totalUSD) || 0;
               const balance = orderTotal - totalPaid;
-              const dateStr = order.date && !isNaN(new Date(order.date).getTime()) ? new Date(order.date).toLocaleDateString() : 'N/A';
+              
+              // Validación segura de fecha
+              let dateStr = 'N/A';
+              if (order.date) {
+                 try {
+                     const d = new Date(order.date);
+                     if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString();
+                 } catch { /* ignore */ }
+              }
               
               return (
               <tr key={order.id} className="hover:bg-stone-50/50 transition-colors">
