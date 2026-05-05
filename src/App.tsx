@@ -6,7 +6,7 @@ import {
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook,
   CheckCircle, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, 
   Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock,
-  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save
+  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save, ShieldAlert
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -39,6 +39,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [systemUsers, setSystemUsers] = useState([]); // Base de datos de clientes registrados
   const [bcvRate, setBcvRate] = useState(36.50);
   const [cart, setCart] = useState([]);
   
@@ -99,6 +100,8 @@ export default function App() {
     });
 
     let unsubOrders = () => {};
+    let unsubUsers = () => {};
+    
     if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
         const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
@@ -108,12 +111,17 @@ export default function App() {
         });
         setOrders(sortedOrders);
       });
+
+      unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+        setSystemUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
     }
 
     return () => {
       unsubProducts();
       unsubCategories();
       unsubOrders();
+      unsubUsers();
     };
   }, [currentUser]);
 
@@ -156,7 +164,7 @@ export default function App() {
       />
       <main className="flex-grow container mx-auto px-4 py-8 relative">
         {currentUser?.role === 'admin' ? (
-          <AdminDashboard products={products} categories={categories} orders={orders} bcvRate={bcvRate} />
+          <AdminDashboard products={products} categories={categories} orders={orders} systemUsers={systemUsers} bcvRate={bcvRate} />
         ) : (
           <ClientStorefront 
             products={products} 
@@ -192,6 +200,7 @@ function AuthScreen({ view, setView }) {
           name: formData.name,
           phone: formData.phone,
           address: formData.address,
+          email: formData.email,
           role: formData.email.toLowerCase().includes('admin') ? 'admin' : 'client'
         });
       }
@@ -362,7 +371,7 @@ function Footer() {
 }
 
 // --- ADMIN COMPONENTS ---
-function AdminDashboard({ products, categories, orders, bcvRate }) {
+function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) {
   const [activeTab, setActiveTab] = useState('orders');
 
   return (
@@ -399,7 +408,7 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
         {activeTab === 'kpis' && <AdminKPIs orders={orders} bcvRate={bcvRate} />}
         {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
         {activeTab === 'delivery' && <AdminDeliveryRoute orders={orders} bcvRate={bcvRate} />}
-        {activeTab === 'customers' && <AdminCustomers orders={orders} />}
+        {activeTab === 'customers' && <AdminCustomers orders={orders} systemUsers={systemUsers} />}
         {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
         {activeTab === 'categories' && <AdminCategories categories={categories} />}
       </div>
@@ -411,18 +420,24 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
 function AdminDeliveryRoute({ orders, bcvRate }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedShift, setSelectedShift] = useState('Todos');
-  const [routeIds, setRouteIds] = useState([]); // Array para mantener el orden de los IDs seleccionados
+  const [routeIds, setRouteIds] = useState([]);
 
-  // Limpiar la ruta en construcción si cambias de día o turno
   useEffect(() => {
     setRouteIds([]);
   }, [selectedDate, selectedShift]);
 
-  // Filtrar todos los pedidos que aplican para este día y turno (excluyendo cancelados)
   const filteredOrders = orders.filter(o => {
     if (o.status === 'Cancelado') return false; 
     
-    const orderDate = o.deliveryDate || (o.date ? o.date.split('T')[0] : '');
+    // Extracción segura de la fecha
+    let orderDate = o.deliveryDate || '';
+    if (!orderDate && o.date) {
+      try {
+        const d = new Date(o.date);
+        if(!isNaN(d.getTime())) orderDate = d.toISOString().split('T')[0];
+      } catch(e) {}
+    }
+
     if (orderDate !== selectedDate) return false;
 
     if (selectedShift !== 'Todos') {
@@ -433,27 +448,19 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
     return true;
   });
 
-  // Dividir los pedidos en dos grupos: Los que están en la ruta actual y los disponibles
   const routeOrders = routeIds.map(id => filteredOrders.find(o => o.id === id)).filter(Boolean);
   const availableOrders = filteredOrders.filter(o => !routeIds.includes(o.id));
 
-  const addToRoute = (id) => {
-    setRouteIds([...routeIds, id]);
-  };
-
-  const removeFromRoute = (id) => {
-    setRouteIds(routeIds.filter(routeId => routeId !== id));
-  };
+  const addToRoute = (id) => setRouteIds([...routeIds, id]);
+  const removeFromRoute = (id) => setRouteIds(routeIds.filter(routeId => routeId !== id));
 
   const moveOrder = (index, direction) => {
     if (direction === -1 && index === 0) return;
     if (direction === 1 && index === routeIds.length - 1) return;
-    
     const newRouteIds = [...routeIds];
     const temp = newRouteIds[index];
     newRouteIds[index] = newRouteIds[index + direction];
     newRouteIds[index + direction] = temp;
-    
     setRouteIds(newRouteIds);
   };
 
@@ -468,10 +475,7 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
   };
 
   const generateWhatsAppMessage = () => {
-    if (routeOrders.length === 0) {
-      alert("No has añadido pedidos a la ruta actual.");
-      return;
-    }
+    if (routeOrders.length === 0) return alert("No has añadido pedidos a la ruta actual.");
 
     let msg = `🚚 *RUTA DE ENTREGA DECOMER* 🚚\n`;
     msg += `📅 *Fecha:* ${selectedDate.split('-').reverse().join('/')}\n`;
@@ -495,7 +499,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
       } else {
         msg += `\n✅ *PAGADO* (Solo entregar)\n`;
       }
-      
       msg += `--------------------------\n\n`;
     });
 
@@ -512,7 +515,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
         <p className="text-stone-500">Selecciona los pedidos y arma la ruta específica para un motorizado.</p>
       </div>
 
-      {/* Panel de Filtros */}
       <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 items-end">
         <div className="flex flex-col md:flex-row gap-4 w-full">
           <div className="flex-1">
@@ -542,8 +544,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* PANEL 1: PEDIDOS DISPONIBLES */}
         <div className="bg-white rounded-3xl shadow-sm border border-stone-200 flex flex-col max-h-[800px]">
           <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center rounded-t-3xl shrink-0">
             <div>
@@ -600,7 +600,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
           </div>
         </div>
 
-        {/* PANEL 2: RUTA EN CONSTRUCCIÓN */}
         <div className="bg-white rounded-3xl shadow-lg border-2 border-green-500 flex flex-col max-h-[800px] relative overflow-hidden">
           <div className="p-4 bg-green-50 border-b border-green-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
             <div>
@@ -641,15 +640,12 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
                   const balance = calculateBalance(order);
                   return (
                     <div key={order.id} className="p-4 flex gap-3 hover:bg-green-50/30 transition-colors">
-                      
-                      {/* Controles de Orden (Izquierda) */}
                       <div className="flex flex-col gap-1 shrink-0 bg-stone-50 p-1 rounded-xl h-fit border border-stone-100">
                         <button onClick={() => moveOrder(index, -1)} disabled={index === 0} className="p-1 text-stone-400 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded transition-colors"><ArrowUp className="w-4 h-4"/></button>
                         <div className="w-6 h-6 flex items-center justify-center font-black text-green-700 bg-green-100 rounded text-xs">{index + 1}</div>
                         <button onClick={() => moveOrder(index, 1)} disabled={index === routeOrders.length - 1} className="p-1 text-stone-400 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded transition-colors"><ArrowDown className="w-4 h-4"/></button>
                       </div>
 
-                      {/* Info del Pedido (Centro) */}
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex justify-between items-start">
                           <div>
@@ -697,7 +693,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -713,16 +708,20 @@ function AdminKPIs({ orders, bcvRate }) {
   
   const monthOrders = validOrders.filter((o) => {
     if(!o.date) return false;
-    const d = new Date(o.date);
-    if(isNaN(d.getTime())) return false;
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    try {
+      const d = new Date(o.date);
+      if(isNaN(d.getTime())) return false;
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    } catch { return false; }
   });
 
   const todayOrders = validOrders.filter((o) => {
     if(!o.date) return false;
-    const d = new Date(o.date);
-    if(isNaN(d.getTime())) return false;
-    return d.toLocaleDateString() === todayStr;
+    try {
+      const d = new Date(o.date);
+      if(isNaN(d.getTime())) return false;
+      return d.toLocaleDateString() === todayStr;
+    } catch { return false; }
   });
 
   const monthSalesUSD = monthOrders.reduce((sum, o) => sum + (Number(o.totalUSD) || 0), 0);
@@ -793,37 +792,60 @@ function AdminKPIs({ orders, bcvRate }) {
   );
 }
 
-// --- MÓDULO REDISEÑADO Y BLINDADO: MIS CLIENTES ---
-function AdminCustomers({ orders }) {
+// --- MÓDULO REDISEÑADO CON BLINDAJE EXTREMO ---
+function AdminCustomers({ orders, systemUsers }) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const clientMap = new Map();
+  // Envolvermos TODO el componente en un Try/Catch.
+  // Si la base de datos envía basura u ocurre un error, muestra una cajita roja en lugar de pantalla negra.
+  try {
+    const clientMap = new Map();
 
-  // 1. Procesar a cada cliente de manera INDIVIDUAL con try/catch 
-  // Esto garantiza que si un pedido está corrupto, NO rompa toda la lista.
-  if (Array.isArray(orders)) {
-    for (const order of orders) {
-      try {
-        if (!order || order.status === 'Cancelado') continue;
+    // 1. Agregar a los usuarios registrados en la plataforma (Solución: "no está mirando para donde es")
+    if (Array.isArray(systemUsers)) {
+      systemUsers.forEach(u => {
+        if (u.role === 'admin') return; // Omitimos admins
+        
+        const name = String(u.name || 'Usuario Sin Nombre').trim();
+        const phone = String(u.phone || 'Sin Teléfono').trim();
+        
+        const key = (phone && phone !== 'Sin Teléfono' && phone !== 'undefined') ? phone : name.toLowerCase();
 
-        // Escaneo profundo: Buscar el nombre y teléfono en todos los formatos posibles que haya tenido la base de datos a lo largo del tiempo
+        clientMap.set(key, {
+          name: name,
+          phone: phone,
+          address: String(u.address || ''),
+          totalOrders: 0,
+          totalSpent: 0,
+          lastOrder: null,
+          isRegistered: true // Etiqueta especial
+        });
+      });
+    }
+
+    // 2. Escanear el historial de pedidos y combinar la información
+    if (Array.isArray(orders)) {
+      orders.forEach(order => {
+        if (!order || order.status === 'Cancelado') return;
+
+        // Escaneo profundo para buscar el nombre
         const rawName = order.senderName || order.customerName || order.name || order.recipientName || 'Cliente Anónimo';
         const rawPhone = order.senderPhone || order.phone || order.recipientPhone || 'Sin Teléfono';
 
-        // Aseguramos que siempre sea un string manejable
         const name = String(rawName).trim();
         const phone = String(rawPhone).trim();
 
-        // Evitar que todos los clientes sin teléfono se agrupen bajo la misma llave 'Sin Teléfono'
         const key = (phone && phone !== 'Sin Teléfono' && phone !== 'undefined') ? phone : name.toLowerCase();
 
         if (!clientMap.has(key)) {
           clientMap.set(key, {
             name: name,
             phone: phone,
+            address: String(order.deliveryAddress || order.address || ''),
             totalOrders: 0,
             totalSpent: 0,
-            lastOrder: order.date || null
+            lastOrder: null,
+            isRegistered: false
           });
         }
 
@@ -831,115 +853,136 @@ function AdminCustomers({ orders }) {
         client.totalOrders += 1;
         client.totalSpent += (Number(order.totalUSD) || 0);
 
-        // Calcular de manera ultra-segura la fecha del último pedido
+        // Actualizar la fecha del último pedido
         if (order.date) {
-           if (!client.lastOrder) {
+          if (!client.lastOrder) {
+            client.lastOrder = order.date;
+          } else {
+            const newD = new Date(order.date);
+            const oldD = new Date(client.lastOrder);
+            if (!isNaN(newD.getTime()) && !isNaN(oldD.getTime()) && newD > oldD) {
               client.lastOrder = order.date;
-           } else {
-              const newDateObj = new Date(order.date);
-              const oldDateObj = new Date(client.lastOrder);
-              
-              if (!isNaN(newDateObj.getTime()) && !isNaN(oldDateObj.getTime()) && newDateObj > oldDateObj) {
-                 client.lastOrder = order.date;
-                 client.name = name; // Actualizar al nombre más reciente usado
-              }
-           }
+              // Actualiza el nombre solo si no es un usuario registrado (los registrados tienen nombre fijo)
+              if (!client.isRegistered) client.name = name; 
+            }
+          }
         }
-      } catch (e) {
-        console.error("Se omitió un pedido dañado en Mis Clientes:", e, order);
-      }
+      });
     }
-  }
 
-  // 2. Ordenar de mayor a menor inversión
-  const allCustomers = Array.from(clientMap.values()).sort((a, b) => (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0));
+    // Convertir a Array y ordenar (Primero por gasto, luego por registrados)
+    const allCustomers = Array.from(clientMap.values()).sort((a, b) => {
+       const diff = (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0);
+       if (diff !== 0) return diff;
+       return (b.isRegistered ? 1 : 0) - (a.isRegistered ? 1 : 0);
+    });
 
-  // 3. Filtrar de manera segura
-  const filteredCustomers = allCustomers.filter(c => {
-    const term = String(searchTerm || '').toLowerCase();
-    const safeName = String(c.name || '').toLowerCase();
-    const safePhone = String(c.phone || '').toLowerCase();
-    return safeName.includes(term) || safePhone.includes(term);
-  });
+    const filteredCustomers = allCustomers.filter(c => {
+      const term = String(searchTerm || '').toLowerCase();
+      return String(c.name || '').toLowerCase().includes(term) || String(c.phone || '').toLowerCase().includes(term);
+    });
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
-          <p className="text-stone-500 text-sm mt-1">Generado automáticamente según el historial de compras</p>
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
+            <p className="text-stone-500 text-sm mt-1">Sincronizado con usuarios web e historial de compras</p>
+          </div>
+          
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+            <input 
+              type="text" 
+              placeholder="Buscar cliente o tlf..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-stone-200 rounded-xl outline-none focus:border-blue-500 text-sm shadow-sm bg-white"
+            />
+          </div>
         </div>
-        
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-          <input 
-            type="text" 
-            placeholder="Buscar cliente o tlf..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-stone-200 rounded-xl outline-none focus:border-blue-500 text-sm shadow-sm"
-          />
-        </div>
-      </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
-                <th className="p-4 font-bold">Cliente</th>
-                <th className="p-4 font-bold text-center">Pedidos</th>
-                <th className="p-4 font-bold">Total Invertido</th>
-                <th className="p-4 font-bold hidden sm:table-cell">Última Compra</th>
-                <th className="p-4 font-bold text-right">Contacto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {filteredCustomers.map((client, idx) => (
-                <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                  <td className="p-4">
-                    <p className="font-bold text-gray-900">{String(client.name)}</p>
-                    <p className="text-xs text-stone-500 font-medium">{String(client.phone)}</p>
-                  </td>
-                  <td className="p-4 text-center">
-                    <span className="bg-stone-100 text-stone-700 font-bold px-3 py-1 rounded-full text-xs">
-                      {Number(client.totalOrders) || 0}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <p className="font-black text-green-600">${(Number(client.totalSpent) || 0).toFixed(2)}</p>
-                  </td>
-                  <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
-                    {client.lastOrder ? (() => {
-                      try {
-                        const d = new Date(client.lastOrder);
-                        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
-                      } catch { return 'N/A'; }
-                    })() : 'N/A'}
-                  </td>
-                  <td className="p-4 text-right">
-                    {client.phone && client.phone !== 'Sin Teléfono' && client.phone !== 'undefined' && (
-                      <a 
-                        href={`https://wa.me/${String(client.phone).replace(/\D/g,'')}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 bg-[#25D366]/10 text-[#1ebd5a] hover:bg-[#25D366] hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                      >
-                        <MessageCircle className="w-4 h-4" /> Escribir
-                      </a>
-                    )}
-                  </td>
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
+                  <th className="p-4 font-bold">Cliente</th>
+                  <th className="p-4 font-bold text-center">Pedidos</th>
+                  <th className="p-4 font-bold">Total Invertido</th>
+                  <th className="p-4 font-bold hidden sm:table-cell">Última Compra</th>
+                  <th className="p-4 font-bold text-right">Contacto</th>
                 </tr>
-              ))}
-              {filteredCustomers.length === 0 && (
-                <tr><td colSpan="5" className="p-8 text-center text-stone-500">No se encontraron clientes o el registro está vacío.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {filteredCustomers.map((client, idx) => (
+                  <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                    <td className="p-4">
+                      <p className="font-bold text-gray-900 flex items-center flex-wrap gap-2">
+                        {client.name}
+                        {client.isRegistered && <span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md font-bold border border-blue-200 uppercase">Web</span>}
+                      </p>
+                      <p className="text-xs text-stone-500 font-medium mt-0.5">{client.phone}</p>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className="bg-stone-100 text-stone-700 font-bold px-3 py-1 rounded-full text-xs">
+                        {client.totalOrders}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <p className="font-black text-green-600">${client.totalSpent.toFixed(2)}</p>
+                    </td>
+                    <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
+                      {client.lastOrder ? (() => {
+                        try {
+                          const d = new Date(client.lastOrder);
+                          return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+                        } catch { return 'N/A'; }
+                      })() : 'N/A'}
+                    </td>
+                    <td className="p-4 text-right">
+                      {client.phone && client.phone !== 'Sin Teléfono' && client.phone !== 'undefined' && (
+                        <a 
+                          href={`https://wa.me/${String(client.phone).replace(/\D/g,'')}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-[#25D366]/10 text-[#1ebd5a] hover:bg-[#25D366] hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <MessageCircle className="w-4 h-4" /> Escribir
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filteredCustomers.length === 0 && (
+                  <tr><td colSpan="5" className="p-8 text-center text-stone-500">No se encontraron clientes registrados ni en historial de compras.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  } catch (error) {
+    // ESTO ES EL ESCUDO ANTI-PANTALLA NEGRA
+    // Si la base de datos envía un dato totalmente roto, en vez de colapsar la app, muestra esto:
+    console.error("Error Crítico Interceptado en Directorio de Clientes:", error);
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
+        <div className="p-8 bg-red-50 border border-red-200 rounded-3xl text-center shadow-inner">
+          <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4 opacity-80" />
+          <h3 className="text-xl font-bold text-red-800 mb-2">Se bloqueó un fallo en la pantalla</h3>
+          <p className="text-red-600 font-medium max-w-md mx-auto mb-4">
+            El sistema detectó un registro corrupto y detuvo la carga de la tabla para evitar que toda la aplicación colapsara (Pantalla Negra interceptada).
+          </p>
+          <div className="bg-white p-3 rounded-xl border border-red-100 text-xs text-red-800 font-mono inline-block text-left">
+            Error original: {error.message}
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
 
 function AdminOrders({ orders, bcvRate, products }) {
