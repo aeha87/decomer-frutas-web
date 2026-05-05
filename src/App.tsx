@@ -797,86 +797,70 @@ function AdminKPIs({ orders, bcvRate }) {
 function AdminCustomers({ orders }) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. Proteger la inicialización usando manejo de errores robusto
-  let filteredCustomers = [];
-  try {
-    const clientMap = new Map();
-    
-    // Iterar sobre los pedidos asegurándose de que 'orders' sea un arreglo
-    (orders || []).forEach((order) => {
-      // Ignorar si el pedido fue cancelado o si el objeto está corrupto
-      if (!order || order.status === 'Cancelado') return;
+  const clientMap = new Map();
 
-      // Usar String() evita que caiga si viene un objeto o valor inesperado
-      const name = String(order.senderName || order.customerName || 'Cliente Anónimo').trim();
-      const phone = String(order.senderPhone || order.phone || 'Sin Teléfono').trim();
-      
-      const key = phone !== 'Sin Teléfono' ? phone : name.toLowerCase();
+  // 1. Procesar a cada cliente de manera INDIVIDUAL con try/catch 
+  // Esto garantiza que si un pedido está corrupto, NO rompa toda la lista.
+  if (Array.isArray(orders)) {
+    for (const order of orders) {
+      try {
+        if (!order || order.status === 'Cancelado') continue;
 
-      if (!clientMap.has(key)) {
-        clientMap.set(key, { 
-          name: name, 
-          phone: phone, 
-          totalOrders: 0, 
-          totalSpent: 0, 
-          lastOrder: order.date || null
-        });
-      }
-      
-      const client = clientMap.get(key);
-      if (client) {
+        // Escaneo profundo: Buscar el nombre y teléfono en todos los formatos posibles que haya tenido la base de datos a lo largo del tiempo
+        const rawName = order.senderName || order.customerName || order.name || order.recipientName || 'Cliente Anónimo';
+        const rawPhone = order.senderPhone || order.phone || order.recipientPhone || 'Sin Teléfono';
+
+        // Aseguramos que siempre sea un string manejable
+        const name = String(rawName).trim();
+        const phone = String(rawPhone).trim();
+
+        // Evitar que todos los clientes sin teléfono se agrupen bajo la misma llave 'Sin Teléfono'
+        const key = (phone && phone !== 'Sin Teléfono' && phone !== 'undefined') ? phone : name.toLowerCase();
+
+        if (!clientMap.has(key)) {
+          clientMap.set(key, {
+            name: name,
+            phone: phone,
+            totalOrders: 0,
+            totalSpent: 0,
+            lastOrder: order.date || null
+          });
+        }
+
+        const client = clientMap.get(key);
         client.totalOrders += 1;
         client.totalSpent += (Number(order.totalUSD) || 0);
-        
-        // Calcular de forma segura cuál es el último pedido
-        if (order.date && client.lastOrder) {
-          const newDate = new Date(order.date);
-          const oldDate = new Date(client.lastOrder);
-          
-          // Solo comparar si ambas fechas son válidas (evita colapso de React)
-          if (!isNaN(newDate.getTime()) && !isNaN(oldDate.getTime())) {
-            if (newDate > oldDate) {
+
+        // Calcular de manera ultra-segura la fecha del último pedido
+        if (order.date) {
+           if (!client.lastOrder) {
               client.lastOrder = order.date;
-              client.name = name; 
-            }
-          }
-        } else if (order.date && !client.lastOrder) {
-          client.lastOrder = order.date;
+           } else {
+              const newDateObj = new Date(order.date);
+              const oldDateObj = new Date(client.lastOrder);
+              
+              if (!isNaN(newDateObj.getTime()) && !isNaN(oldDateObj.getTime()) && newDateObj > oldDateObj) {
+                 client.lastOrder = order.date;
+                 client.name = name; // Actualizar al nombre más reciente usado
+              }
+           }
         }
+      } catch (e) {
+        console.error("Se omitió un pedido dañado en Mis Clientes:", e, order);
       }
-    });
-
-    // 2. Convertir el mapa a un array y ordenar (Asegurando que no se rompa si totalSpent es NaN)
-    const allCustomers = Array.from(clientMap.values()).sort((a, b) => {
-      const spentA = Number(a.totalSpent) || 0;
-      const spentB = Number(b.totalSpent) || 0;
-      return spentB - spentA;
-    });
-
-    // 3. Aplicar el filtro de búsqueda de forma segura
-    filteredCustomers = allCustomers.filter(c => {
-      const safeName = String(c.name || '').toLowerCase();
-      const safePhone = String(c.phone || '').toLowerCase();
-      const term = String(searchTerm || '').toLowerCase();
-      return safeName.includes(term) || safePhone.includes(term);
-    });
-
-  } catch (error) {
-    console.error("Error al renderizar el directorio de clientes:", error);
-    // Si algo falla, dejamos la lista vacía para no romper la pantalla
-    filteredCustomers = [];
+    }
   }
 
-  // Helper seguro para renderizar las fechas
-  const renderSafeDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      const d = new Date(dateString);
-      return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
-    } catch {
-      return 'N/A';
-    }
-  };
+  // 2. Ordenar de mayor a menor inversión
+  const allCustomers = Array.from(clientMap.values()).sort((a, b) => (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0));
+
+  // 3. Filtrar de manera segura
+  const filteredCustomers = allCustomers.filter(c => {
+    const term = String(searchTerm || '').toLowerCase();
+    const safeName = String(c.name || '').toLowerCase();
+    const safePhone = String(c.phone || '').toLowerCase();
+    return safeName.includes(term) || safePhone.includes(term);
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -914,8 +898,8 @@ function AdminCustomers({ orders }) {
               {filteredCustomers.map((client, idx) => (
                 <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
                   <td className="p-4">
-                    <p className="font-bold text-gray-900">{client.name}</p>
-                    <p className="text-xs text-stone-500 font-medium">{client.phone}</p>
+                    <p className="font-bold text-gray-900">{String(client.name)}</p>
+                    <p className="text-xs text-stone-500 font-medium">{String(client.phone)}</p>
                   </td>
                   <td className="p-4 text-center">
                     <span className="bg-stone-100 text-stone-700 font-bold px-3 py-1 rounded-full text-xs">
@@ -926,10 +910,15 @@ function AdminCustomers({ orders }) {
                     <p className="font-black text-green-600">${(Number(client.totalSpent) || 0).toFixed(2)}</p>
                   </td>
                   <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
-                    {renderSafeDate(client.lastOrder)}
+                    {client.lastOrder ? (() => {
+                      try {
+                        const d = new Date(client.lastOrder);
+                        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+                      } catch { return 'N/A'; }
+                    })() : 'N/A'}
                   </td>
                   <td className="p-4 text-right">
-                    {client.phone && client.phone !== 'Sin Teléfono' && (
+                    {client.phone && client.phone !== 'Sin Teléfono' && client.phone !== 'undefined' && (
                       <a 
                         href={`https://wa.me/${String(client.phone).replace(/\D/g,'')}`} 
                         target="_blank" 
@@ -943,7 +932,7 @@ function AdminCustomers({ orders }) {
                 </tr>
               ))}
               {filteredCustomers.length === 0 && (
-                <tr><td colSpan="5" className="p-8 text-center text-stone-500">No se encontraron clientes.</td></tr>
+                <tr><td colSpan="5" className="p-8 text-center text-stone-500">No se encontraron clientes o el registro está vacío.</td></tr>
               )}
             </tbody>
           </table>
