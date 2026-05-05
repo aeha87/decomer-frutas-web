@@ -5,7 +5,8 @@ import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot
 import { 
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook,
   CheckCircle, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, 
-  Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock
+  Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock,
+  Map, ArrowUp, ArrowDown, Share2, AlertTriangle
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -382,6 +383,10 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
               <ShoppingBag className="w-5 h-5" /> Pedidos 
               {orders.filter((o)=>o.status==='Pendiente').length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{orders.filter((o)=>o.status==='Pendiente').length}</span>}
             </button>
+            
+            {/* NUEVA PESTAÑA: Rutas de Entrega */}
+            <button onClick={() => setActiveTab('delivery')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> Rutas de Entrega</button>
+            
             <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'customers' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
             
             <div className="pt-4 mt-4 border-t border-stone-100"></div>
@@ -395,9 +400,230 @@ function AdminDashboard({ products, categories, orders, bcvRate }) {
       <div className="flex-1 min-w-0">
         {activeTab === 'kpis' && <AdminKPIs orders={orders} bcvRate={bcvRate} />}
         {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
+        {activeTab === 'delivery' && <AdminDeliveryRoute orders={orders} bcvRate={bcvRate} />}
         {activeTab === 'customers' && <AdminCustomers orders={orders} />}
         {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
         {activeTab === 'categories' && <AdminCategories categories={categories} />}
+      </div>
+    </div>
+  );
+}
+
+// --- NUEVO COMPONENTE: RUTAS DE ENTREGA ---
+function AdminDeliveryRoute({ orders, bcvRate }) {
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedShift, setSelectedShift] = useState('Todos');
+  const [routeOrders, setRouteOrders] = useState([]);
+
+  // Filtrar órdenes al cambiar fecha o turno
+  useEffect(() => {
+    const filtered = orders.filter(o => {
+      if (o.status === 'Cancelado') return false; // Ignorar cancelados
+      
+      // Manejar la fecha (pedidos manuales viejos pueden no tener deliveryDate)
+      const orderDate = o.deliveryDate || (o.date ? o.date.split('T')[0] : '');
+      if (orderDate !== selectedDate) return false;
+
+      // Manejar turno
+      if (selectedShift !== 'Todos') {
+        const orderShift = o.deliveryTimeSlot || '';
+        if (selectedShift === 'Mañana' && !orderShift.includes('Mañana')) return false;
+        if (selectedShift === 'Tarde' && !orderShift.includes('Tarde')) return false;
+      }
+      return true;
+    });
+
+    // Mantener el orden actual si ya estaban en la lista (para no desordenar al actualizar un pago)
+    const currentIds = routeOrders.map(ro => ro.id);
+    const newOrders = filtered.filter(f => !currentIds.includes(f.id));
+    
+    // Actualizar los datos de los que ya estaban y agregar los nuevos al final
+    const updatedExisting = routeOrders.map(ro => filtered.find(f => f.id === ro.id)).filter(Boolean);
+    
+    setRouteOrders([...updatedExisting, ...newOrders]);
+  }, [orders, selectedDate, selectedShift]);
+
+  const moveOrder = (index, direction) => {
+    if (direction === -1 && index === 0) return;
+    if (direction === 1 && index === routeOrders.length - 1) return;
+    
+    const newRoute = [...routeOrders];
+    const temp = newRoute[index];
+    newRoute[index] = newRoute[index + direction];
+    newRoute[index + direction] = temp;
+    
+    setRouteOrders(newRoute);
+  };
+
+  const calculateBalance = (order) => {
+    const totalPaid = (order.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
+    const orderTotal = Number(order.totalUSD) || 0;
+    return Math.max(0, orderTotal - totalPaid);
+  };
+
+  const handleUpdateStatus = async (id, newStatus) => {
+    await updateDoc(doc(db, 'orders', id), { status: newStatus });
+  };
+
+  const generateWhatsAppMessage = () => {
+    let msg = `🚚 *RUTA DE ENTREGA DECOMER* 🚚\n`;
+    msg += `📅 *Fecha:* ${selectedDate.split('-').reverse().join('/')}\n`;
+    msg += `⏰ *Turno:* ${selectedShift}\n\n`;
+
+    if (routeOrders.length === 0) {
+      alert("No hay pedidos en la ruta para generar el mensaje.");
+      return;
+    }
+
+    routeOrders.forEach((order, index) => {
+      const balance = calculateBalance(order);
+      
+      msg += `*📍 PARADA ${index + 1}:* ${order.displayId || 'PED'}\n`;
+      msg += `👤 *Recibe:* ${order.recipientName || order.customerName || 'N/A'}\n`;
+      msg += `📞 *Teléfono:* ${order.recipientPhone || order.phone || order.senderPhone || 'N/A'}\n`;
+      msg += `🏠 *Dirección:* ${order.deliveryAddress || order.address || 'N/A'}\n`;
+      
+      // Resumen de productos
+      const itemsList = order.items.map(i => `${i.quantity}x ${i.name}`).join(', ');
+      msg += `📦 *Entregar:* ${itemsList}\n`;
+
+      if (balance > 0) {
+        msg += `\n💰 ⚠️ *¡¡ATENCIÓN!! COBRAR AL ENTREGAR:* ⚠️\n`;
+        msg += `💵 Monto: *$${balance.toFixed(2)} USD*\n`;
+        msg += `🇻🇪 En Bs: *Bs. ${(balance * bcvRate).toFixed(2)}*\n`;
+      } else {
+        msg += `\n✅ *PAGADO* (Solo entregar)\n`;
+      }
+      
+      msg += `--------------------------\n\n`;
+    });
+
+    msg += `*Conduce con cuidado.* 🍓🍫`;
+
+    const encodedMsg = encodeURIComponent(msg);
+    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Map className="w-6 h-6 text-red-600"/> Enrutador de Entregas</h2>
+        <p className="text-stone-500">Organiza las paradas y genera el resumen para el motorizado.</p>
+      </div>
+
+      {/* Controles de Filtro */}
+      <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-end">
+        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+          <div>
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">Fecha de Entrega</label>
+            <input 
+              type="date" 
+              value={selectedDate} 
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:border-red-500 text-sm font-bold text-gray-800 w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">Turno</label>
+            <div className="flex bg-stone-100 p-1 rounded-xl w-full">
+              {['Todos', 'Mañana', 'Tarde'].map(shift => (
+                <button 
+                  key={shift} 
+                  onClick={() => setSelectedShift(shift)}
+                  className={`flex-1 px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${selectedShift === shift ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+                >
+                  {shift}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <button 
+          onClick={generateWhatsAppMessage}
+          disabled={routeOrders.length === 0}
+          className="bg-[#25D366] hover:bg-[#1ebd5a] disabled:bg-stone-300 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2 w-full md:w-auto justify-center"
+        >
+          <Share2 className="w-4 h-4" /> Enviar Ruta por WhatsApp
+        </button>
+      </div>
+
+      {/* Lista Ruteable */}
+      <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden">
+        <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
+          <h3 className="font-bold text-stone-700 text-sm flex items-center gap-2"><Truck className="w-4 h-4"/> Paradas Activas ({routeOrders.length})</h3>
+          <p className="text-xs text-stone-500">Usa las flechas para ordenar la ruta.</p>
+        </div>
+
+        <div className="divide-y divide-stone-100">
+          {routeOrders.length === 0 ? (
+            <div className="p-12 text-center text-stone-400">
+              <Map className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p className="font-medium">No hay entregas programadas para esta fecha y turno.</p>
+            </div>
+          ) : (
+            routeOrders.map((order, index) => {
+              const balance = calculateBalance(order);
+              const isCompleted = order.status === 'Completado';
+
+              return (
+              <div key={order.id} className={`p-4 sm:p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center transition-colors ${isCompleted ? 'bg-stone-50 opacity-60' : 'hover:bg-blue-50/30'}`}>
+                
+                {/* Controles de Orden (Izquierda) */}
+                <div className="flex flex-row sm:flex-col gap-1 shrink-0 bg-stone-100 p-1.5 rounded-xl">
+                  <button onClick={() => moveOrder(index, -1)} disabled={index === 0} className="p-1.5 text-stone-500 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded-lg transition-colors"><ArrowUp className="w-4 h-4"/></button>
+                  <div className="w-8 h-8 flex items-center justify-center font-black text-gray-800 bg-white rounded-lg shadow-sm">{index + 1}</div>
+                  <button onClick={() => moveOrder(index, 1)} disabled={index === routeOrders.length - 1} className="p-1.5 text-stone-500 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded-lg transition-colors"><ArrowDown className="w-4 h-4"/></button>
+                </div>
+
+                {/* Info del Pedido (Centro) */}
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-black text-gray-900 text-lg">{order.displayId}</span>
+                    {balance > 0 ? (
+                      <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-black flex items-center gap-1 border border-red-200">
+                        <AlertTriangle className="w-3 h-3" /> COBRAR: ${balance.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-green-200">Pagado</span>
+                    )}
+                    {isCompleted && <span className="bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">Entregado</span>}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                    <div>
+                      <p><span className="font-bold text-stone-500">Recibe:</span> {order.recipientName || order.customerName}</p>
+                      <p className="flex items-center gap-1 text-stone-500"><Phone className="w-3 h-3"/> {order.recipientPhone || order.phone}</p>
+                    </div>
+                    <div>
+                      <p className="line-clamp-2"><span className="font-bold text-stone-500">Dirección:</span> {order.deliveryAddress || order.address}</p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-xs text-stone-500 font-medium truncate pt-1">
+                    <span className="font-bold text-stone-400">Productos:</span> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                  </p>
+                </div>
+
+                {/* Status Rápido (Derecha) */}
+                <div className="shrink-0 flex sm:flex-col gap-2 w-full sm:w-auto">
+                   <select 
+                    value={order.status}
+                    onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
+                    className={`text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-xl border-0 outline-none cursor-pointer shadow-sm w-full sm:w-36 text-center
+                      ${order.status === 'Completado' ? 'bg-green-100 text-green-700' : 'bg-white border border-stone-200 text-stone-600'}`}
+                  >
+                    <option value="En Preparación">En Preparación</option>
+                    <option value="Abonado">Abonado</option>
+                    <option value="Pagado">Pagado</option>
+                    <option value="Completado">✓ Entregado</option>
+                  </select>
+                </div>
+
+              </div>
+            )})
+          )}
+        </div>
       </div>
     </div>
   );
