@@ -429,12 +429,14 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
   const filteredOrders = orders.filter(o => {
     if (o.status === 'Cancelado') return false; 
     
-    // Extracción segura de la fecha
+    // Extracción segura de la fecha blindada
     let orderDate = o.deliveryDate || '';
     if (!orderDate && o.date) {
       try {
-        const d = new Date(o.date);
-        if(!isNaN(d.getTime())) orderDate = d.toISOString().split('T')[0];
+        if (typeof o.date === 'string' || typeof o.date === 'number') {
+           const d = new Date(o.date);
+           if(!isNaN(d.getTime())) orderDate = d.toISOString().split('T')[0];
+        }
       } catch(e) {}
     }
 
@@ -709,6 +711,7 @@ function AdminKPIs({ orders, bcvRate }) {
   const monthOrders = validOrders.filter((o) => {
     if(!o.date) return false;
     try {
+      if (typeof o.date !== 'string' && typeof o.date !== 'number') return false;
       const d = new Date(o.date);
       if(isNaN(d.getTime())) return false;
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
@@ -718,6 +721,7 @@ function AdminKPIs({ orders, bcvRate }) {
   const todayOrders = validOrders.filter((o) => {
     if(!o.date) return false;
     try {
+      if (typeof o.date !== 'string' && typeof o.date !== 'number') return false;
       const d = new Date(o.date);
       if(isNaN(d.getTime())) return false;
       return d.toLocaleDateString() === todayStr;
@@ -796,90 +800,119 @@ function AdminKPIs({ orders, bcvRate }) {
 function AdminCustomers({ orders, systemUsers }) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Envolvermos TODO el componente en un Try/Catch.
-  // Si la base de datos envía basura u ocurre un error, muestra una cajita roja en lugar de pantalla negra.
+  // Envolvermos TODO el componente en un Try/Catch como escudo final.
   try {
     const clientMap = new Map();
 
-    // 1. Agregar a los usuarios registrados en la plataforma (Solución: "no está mirando para donde es")
+    // EXTREMA SEGURIDAD PARA SACAR TEXTOS (Evita que objetos corruptos rompan el string)
+    const getSafeString = (val, fallback = '') => {
+      if (val === null || val === undefined) return fallback;
+      try {
+        if (typeof val === 'object') return fallback; 
+        return String(val).trim() || fallback;
+      } catch { return fallback; }
+    };
+
+    // EXTREMA SEGURIDAD PARA FECHAS (Evita el infame "Vh is not a constructor" que ocurre al intentar hacer new Date() de un objeto corrupto)
+    const getSafeTimestamp = (val) => {
+      if (!val) return 0;
+      try {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') {
+          const parsed = Date.parse(val);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        if (typeof val === 'object' && val !== null) {
+          if (typeof val.toDate === 'function') return val.toDate().getTime();
+          if (val.seconds) return val.seconds * 1000;
+        }
+        return 0;
+      } catch { return 0; }
+    };
+
+    // 1. Agregar a los usuarios registrados (con Try/Catch individual por usuario)
     if (Array.isArray(systemUsers)) {
       systemUsers.forEach(u => {
-        if (u.role === 'admin') return; // Omitimos admins
-        
-        const name = String(u.name || 'Usuario Sin Nombre').trim();
-        const phone = String(u.phone || 'Sin Teléfono').trim();
-        
-        const key = (phone && phone !== 'Sin Teléfono' && phone !== 'undefined') ? phone : name.toLowerCase();
+        try {
+          if (u?.role === 'admin') return; 
+          
+          const name = getSafeString(u?.name, 'Usuario Sin Nombre');
+          const phone = getSafeString(u?.phone, 'Sin Teléfono');
+          const address = getSafeString(u?.address, '');
+          
+          const key = (phone !== 'Sin Teléfono') ? phone : name.toLowerCase();
 
-        clientMap.set(key, {
-          name: name,
-          phone: phone,
-          address: String(u.address || ''),
-          totalOrders: 0,
-          totalSpent: 0,
-          lastOrder: null,
-          isRegistered: true // Etiqueta especial
-        });
-      });
-    }
-
-    // 2. Escanear el historial de pedidos y combinar la información
-    if (Array.isArray(orders)) {
-      orders.forEach(order => {
-        if (!order || order.status === 'Cancelado') return;
-
-        // Escaneo profundo para buscar el nombre
-        const rawName = order.senderName || order.customerName || order.name || order.recipientName || 'Cliente Anónimo';
-        const rawPhone = order.senderPhone || order.phone || order.recipientPhone || 'Sin Teléfono';
-
-        const name = String(rawName).trim();
-        const phone = String(rawPhone).trim();
-
-        const key = (phone && phone !== 'Sin Teléfono' && phone !== 'undefined') ? phone : name.toLowerCase();
-
-        if (!clientMap.has(key)) {
           clientMap.set(key, {
             name: name,
             phone: phone,
-            address: String(order.deliveryAddress || order.address || ''),
+            address: address,
             totalOrders: 0,
             totalSpent: 0,
-            lastOrder: null,
-            isRegistered: false
+            lastOrderTime: 0,
+            isRegistered: true 
           });
-        }
-
-        const client = clientMap.get(key);
-        client.totalOrders += 1;
-        client.totalSpent += (Number(order.totalUSD) || 0);
-
-        // Actualizar la fecha del último pedido
-        if (order.date) {
-          if (!client.lastOrder) {
-            client.lastOrder = order.date;
-          } else {
-            const newD = new Date(order.date);
-            const oldD = new Date(client.lastOrder);
-            if (!isNaN(newD.getTime()) && !isNaN(oldD.getTime()) && newD > oldD) {
-              client.lastOrder = order.date;
-              // Actualiza el nombre solo si no es un usuario registrado (los registrados tienen nombre fijo)
-              if (!client.isRegistered) client.name = name; 
-            }
-          }
-        }
+        } catch (e) { console.log("Usuario ignorado por error", e); }
       });
     }
 
-    // Convertir a Array y ordenar (Primero por gasto, luego por registrados)
-    const allCustomers = Array.from(clientMap.values()).sort((a, b) => {
-       const diff = (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0);
-       if (diff !== 0) return diff;
-       return (b.isRegistered ? 1 : 0) - (a.isRegistered ? 1 : 0);
-    });
+    // 2. Escanear el historial de pedidos (con Try/Catch individual por pedido)
+    if (Array.isArray(orders)) {
+      orders.forEach(order => {
+        try {
+          if (!order || order.status === 'Cancelado') return;
+
+          const rawName = order.senderName || order.customerName || order.name || order.recipientName;
+          const rawPhone = order.senderPhone || order.phone || order.recipientPhone;
+
+          const name = getSafeString(rawName, 'Cliente Anónimo');
+          const phone = getSafeString(rawPhone, 'Sin Teléfono');
+          const address = getSafeString(order.deliveryAddress || order.address, '');
+
+          const key = (phone !== 'Sin Teléfono') ? phone : name.toLowerCase();
+
+          if (!clientMap.has(key)) {
+            clientMap.set(key, {
+              name: name,
+              phone: phone,
+              address: address,
+              totalOrders: 0,
+              totalSpent: 0,
+              lastOrderTime: 0,
+              isRegistered: false
+            });
+          }
+
+          const client = clientMap.get(key);
+          client.totalOrders += 1;
+          
+          const safeAmount = Number(order.totalUSD);
+          if (!isNaN(safeAmount)) client.totalSpent += safeAmount;
+
+          const orderTime = getSafeTimestamp(order.date);
+          if (orderTime > client.lastOrderTime) {
+            client.lastOrderTime = orderTime;
+            // Solo sobrescribimos el nombre si no es un usuario web registrado
+            if (!client.isRegistered && name !== 'Cliente Anónimo') {
+               client.name = name; 
+            }
+          }
+        } catch (e) { console.log("Pedido dañado ignorado en Mis Clientes", e); }
+      });
+    }
+
+    // Convertir a Array y ordenar de forma súper segura
+    let allCustomers = [];
+    try {
+      allCustomers = Array.from(clientMap.values()).sort((a, b) => {
+         const diff = (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0);
+         if (diff !== 0) return diff;
+         return (b.isRegistered ? 1 : 0) - (a.isRegistered ? 1 : 0);
+      });
+    } catch(e) { console.log("Fallo en ordenamiento ignorado", e); }
 
     const filteredCustomers = allCustomers.filter(c => {
-      const term = String(searchTerm || '').toLowerCase();
-      return String(c.name || '').toLowerCase().includes(term) || String(c.phone || '').toLowerCase().includes(term);
+      const term = getSafeString(searchTerm).toLowerCase();
+      return getSafeString(c.name).toLowerCase().includes(term) || getSafeString(c.phone).toLowerCase().includes(term);
     });
 
     return (
@@ -933,12 +966,7 @@ function AdminCustomers({ orders, systemUsers }) {
                       <p className="font-black text-green-600">${client.totalSpent.toFixed(2)}</p>
                     </td>
                     <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
-                      {client.lastOrder ? (() => {
-                        try {
-                          const d = new Date(client.lastOrder);
-                          return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
-                        } catch { return 'N/A'; }
-                      })() : 'N/A'}
+                      {client.lastOrderTime > 0 ? new Date(client.lastOrderTime).toLocaleDateString() : 'N/A'}
                     </td>
                     <td className="p-4 text-right">
                       {client.phone && client.phone !== 'Sin Teléfono' && client.phone !== 'undefined' && (
@@ -964,20 +992,18 @@ function AdminCustomers({ orders, systemUsers }) {
       </div>
     );
   } catch (error) {
-    // ESTO ES EL ESCUDO ANTI-PANTALLA NEGRA
-    // Si la base de datos envía un dato totalmente roto, en vez de colapsar la app, muestra esto:
-    console.error("Error Crítico Interceptado en Directorio de Clientes:", error);
+    // Si incluso con todos los filtros de seguridad ALGO falla colosalmente, caerá aquí.
     return (
       <div className="space-y-6 animate-fade-in">
         <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
         <div className="p-8 bg-red-50 border border-red-200 rounded-3xl text-center shadow-inner">
           <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4 opacity-80" />
-          <h3 className="text-xl font-bold text-red-800 mb-2">Se bloqueó un fallo en la pantalla</h3>
+          <h3 className="text-xl font-bold text-red-800 mb-2">Error Critico Bloqueado</h3>
           <p className="text-red-600 font-medium max-w-md mx-auto mb-4">
-            El sistema detectó un registro corrupto y detuvo la carga de la tabla para evitar que toda la aplicación colapsara (Pantalla Negra interceptada).
+            Un problema impidió cargar la lista de clientes. Por favor contacta al desarrollador con este error:
           </p>
           <div className="bg-white p-3 rounded-xl border border-red-100 text-xs text-red-800 font-mono inline-block text-left">
-            Error original: {error.message}
+            {error.message}
           </div>
         </div>
       </div>
@@ -1230,12 +1256,14 @@ function AdminOrders({ orders, bcvRate, products }) {
               const orderTotal = Number(order.totalUSD) || 0;
               const balance = orderTotal - totalPaid;
               
-              // Validación segura de fecha
+              // Validación 100% segura de fecha blindada contra errores Vercel/V8
               let dateStr = 'N/A';
               if (order.date) {
                  try {
-                     const d = new Date(order.date);
-                     if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString();
+                     if (typeof order.date === 'string' || typeof order.date === 'number') {
+                         const d = new Date(order.date);
+                         if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString();
+                     }
                  } catch { /* ignore */ }
               }
               
