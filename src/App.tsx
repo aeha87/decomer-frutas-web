@@ -32,6 +32,20 @@ const VENEZUELAN_BANKS = [
   "Mi Banco", "Banco Caroní", "Banco Exterior"
 ];
 
+const getSafeTime = (dateVal) => {
+  if (!dateVal) return 0;
+  try {
+    if (typeof dateVal === 'object' && dateVal.seconds) {
+       return dateVal.seconds * 1000;
+    }
+    if (typeof dateVal === 'string' || typeof dateVal === 'number') {
+       const d = new Date(dateVal);
+       if (!isNaN(d.getTime())) return d.getTime();
+    }
+  } catch (e) {}
+  return 0;
+};
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -39,7 +53,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [systemUsers, setSystemUsers] = useState([]); // Base de datos de clientes registrados
+  const [systemUsers, setSystemUsers] = useState([]); 
   const [bcvRate, setBcvRate] = useState(36.50);
   const [cart, setCart] = useState([]);
   
@@ -105,8 +119,8 @@ export default function App() {
     if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
         const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
-          const timeA = a.date && !isNaN(new Date(a.date).getTime()) ? new Date(a.date).getTime() : 0;
-          const timeB = b.date && !isNaN(new Date(b.date).getTime()) ? new Date(b.date).getTime() : 0;
+          const timeA = getSafeTime(a.date);
+          const timeB = getSafeTime(b.date);
           return timeB - timeA;
         });
         setOrders(sortedOrders);
@@ -394,7 +408,6 @@ function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) 
             </button>
             
             <button onClick={() => setActiveTab('delivery')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> Rutas de Entrega</button>
-            <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'customers' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
             
             <div className="pt-4 mt-4 border-t border-stone-100"></div>
             
@@ -408,7 +421,6 @@ function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) 
         {activeTab === 'kpis' && <AdminKPIs orders={orders} bcvRate={bcvRate} />}
         {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
         {activeTab === 'delivery' && <AdminDeliveryRoute orders={orders} bcvRate={bcvRate} />}
-        {activeTab === 'customers' && <AdminCustomers orders={orders} systemUsers={systemUsers} />}
         {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
         {activeTab === 'categories' && <AdminCategories categories={categories} />}
       </div>
@@ -796,221 +808,6 @@ function AdminKPIs({ orders, bcvRate }) {
   );
 }
 
-// --- MÓDULO REDISEÑADO CON BLINDAJE EXTREMO ---
-function AdminCustomers({ orders, systemUsers }) {
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Envolvermos TODO el componente en un Try/Catch como escudo final.
-  try {
-    const clientMap = new Map();
-
-    // EXTREMA SEGURIDAD PARA SACAR TEXTOS (Evita que objetos corruptos rompan el string)
-    const getSafeString = (val, fallback = '') => {
-      if (val === null || val === undefined) return fallback;
-      try {
-        if (typeof val === 'object') return fallback; 
-        return String(val).trim() || fallback;
-      } catch { return fallback; }
-    };
-
-    // EXTREMA SEGURIDAD PARA FECHAS (Evita el infame "Vh is not a constructor" que ocurre al intentar hacer new Date() de un objeto corrupto)
-    const getSafeTimestamp = (val) => {
-      if (!val) return 0;
-      try {
-        if (typeof val === 'number') return val;
-        if (typeof val === 'string') {
-          const parsed = Date.parse(val);
-          return isNaN(parsed) ? 0 : parsed;
-        }
-        if (typeof val === 'object' && val !== null) {
-          if (typeof val.toDate === 'function') return val.toDate().getTime();
-          if (val.seconds) return val.seconds * 1000;
-        }
-        return 0;
-      } catch { return 0; }
-    };
-
-    // 1. Agregar a los usuarios registrados (con Try/Catch individual por usuario)
-    if (Array.isArray(systemUsers)) {
-      systemUsers.forEach(u => {
-        try {
-          if (u?.role === 'admin') return; 
-          
-          const name = getSafeString(u?.name, 'Usuario Sin Nombre');
-          const phone = getSafeString(u?.phone, 'Sin Teléfono');
-          const address = getSafeString(u?.address, '');
-          
-          const key = (phone !== 'Sin Teléfono') ? phone : name.toLowerCase();
-
-          clientMap.set(key, {
-            name: name,
-            phone: phone,
-            address: address,
-            totalOrders: 0,
-            totalSpent: 0,
-            lastOrderTime: 0,
-            isRegistered: true 
-          });
-        } catch (e) { console.log("Usuario ignorado por error", e); }
-      });
-    }
-
-    // 2. Escanear el historial de pedidos (con Try/Catch individual por pedido)
-    if (Array.isArray(orders)) {
-      orders.forEach(order => {
-        try {
-          if (!order || order.status === 'Cancelado') return;
-
-          const rawName = order.senderName || order.customerName || order.name || order.recipientName;
-          const rawPhone = order.senderPhone || order.phone || order.recipientPhone;
-
-          const name = getSafeString(rawName, 'Cliente Anónimo');
-          const phone = getSafeString(rawPhone, 'Sin Teléfono');
-          const address = getSafeString(order.deliveryAddress || order.address, '');
-
-          const key = (phone !== 'Sin Teléfono') ? phone : name.toLowerCase();
-
-          if (!clientMap.has(key)) {
-            clientMap.set(key, {
-              name: name,
-              phone: phone,
-              address: address,
-              totalOrders: 0,
-              totalSpent: 0,
-              lastOrderTime: 0,
-              isRegistered: false
-            });
-          }
-
-          const client = clientMap.get(key);
-          client.totalOrders += 1;
-          
-          const safeAmount = Number(order.totalUSD);
-          if (!isNaN(safeAmount)) client.totalSpent += safeAmount;
-
-          const orderTime = getSafeTimestamp(order.date);
-          if (orderTime > client.lastOrderTime) {
-            client.lastOrderTime = orderTime;
-            // Solo sobrescribimos el nombre si no es un usuario web registrado
-            if (!client.isRegistered && name !== 'Cliente Anónimo') {
-               client.name = name; 
-            }
-          }
-        } catch (e) { console.log("Pedido dañado ignorado en Mis Clientes", e); }
-      });
-    }
-
-    // Convertir a Array y ordenar de forma súper segura
-    let allCustomers = [];
-    try {
-      allCustomers = Array.from(clientMap.values()).sort((a, b) => {
-         const diff = (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0);
-         if (diff !== 0) return diff;
-         return (b.isRegistered ? 1 : 0) - (a.isRegistered ? 1 : 0);
-      });
-    } catch(e) { console.log("Fallo en ordenamiento ignorado", e); }
-
-    const filteredCustomers = allCustomers.filter(c => {
-      const term = getSafeString(searchTerm).toLowerCase();
-      return getSafeString(c.name).toLowerCase().includes(term) || getSafeString(c.phone).toLowerCase().includes(term);
-    });
-
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
-            <p className="text-stone-500 text-sm mt-1">Sincronizado con usuarios web e historial de compras</p>
-          </div>
-          
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-            <input 
-              type="text" 
-              placeholder="Buscar cliente o tlf..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-stone-200 rounded-xl outline-none focus:border-blue-500 text-sm shadow-sm bg-white"
-            />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
-                  <th className="p-4 font-bold">Cliente</th>
-                  <th className="p-4 font-bold text-center">Pedidos</th>
-                  <th className="p-4 font-bold">Total Invertido</th>
-                  <th className="p-4 font-bold hidden sm:table-cell">Última Compra</th>
-                  <th className="p-4 font-bold text-right">Contacto</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {filteredCustomers.map((client, idx) => (
-                  <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="p-4">
-                      <p className="font-bold text-gray-900 flex items-center flex-wrap gap-2">
-                        {client.name}
-                        {client.isRegistered && <span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md font-bold border border-blue-200 uppercase">Web</span>}
-                      </p>
-                      <p className="text-xs text-stone-500 font-medium mt-0.5">{client.phone}</p>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="bg-stone-100 text-stone-700 font-bold px-3 py-1 rounded-full text-xs">
-                        {client.totalOrders}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <p className="font-black text-green-600">${client.totalSpent.toFixed(2)}</p>
-                    </td>
-                    <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
-                      {client.lastOrderTime > 0 ? new Date(client.lastOrderTime).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="p-4 text-right">
-                      {client.phone && client.phone !== 'Sin Teléfono' && client.phone !== 'undefined' && (
-                        <a 
-                          href={`https://wa.me/${String(client.phone).replace(/\D/g,'')}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 bg-[#25D366]/10 text-[#1ebd5a] hover:bg-[#25D366] hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                        >
-                          <MessageCircle className="w-4 h-4" /> Escribir
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {filteredCustomers.length === 0 && (
-                  <tr><td colSpan="5" className="p-8 text-center text-stone-500">No se encontraron clientes registrados ni en historial de compras.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  } catch (error) {
-    // Si incluso con todos los filtros de seguridad ALGO falla colosalmente, caerá aquí.
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
-        <div className="p-8 bg-red-50 border border-red-200 rounded-3xl text-center shadow-inner">
-          <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4 opacity-80" />
-          <h3 className="text-xl font-bold text-red-800 mb-2">Error Critico Bloqueado</h3>
-          <p className="text-red-600 font-medium max-w-md mx-auto mb-4">
-            Un problema impidió cargar la lista de clientes. Por favor contacta al desarrollador con este error:
-          </p>
-          <div className="bg-white p-3 rounded-xl border border-red-100 text-xs text-red-800 font-mono inline-block text-left">
-            {error.message}
-          </div>
-        </div>
-      </div>
-    );
-  }
-}
-
 function AdminOrders({ orders, bcvRate, products }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
@@ -1256,12 +1053,14 @@ function AdminOrders({ orders, bcvRate, products }) {
               const orderTotal = Number(order.totalUSD) || 0;
               const balance = orderTotal - totalPaid;
               
-              // Validación 100% segura de fecha blindada contra errores Vercel/V8
               let dateStr = 'N/A';
               if (order.date) {
                  try {
                      if (typeof order.date === 'string' || typeof order.date === 'number') {
                          const d = new Date(order.date);
+                         if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString();
+                     } else if (typeof order.date === 'object' && order.date.seconds) {
+                         const d = new Date(order.date.seconds * 1000);
                          if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString();
                      }
                  } catch { /* ignore */ }
