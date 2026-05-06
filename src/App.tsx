@@ -32,16 +32,46 @@ const VENEZUELAN_BANKS = [
   "Mi Banco", "Banco Caroní", "Banco Exterior"
 ];
 
+// --- ESCUDOS DE SEGURIDAD PARA FECHAS CORRUPTAS ---
+const safeFormatDate = (dateVal: any, includeTime = false) => {
+  if (!dateVal) return 'N/A';
+  try {
+    let d;
+    if (typeof dateVal === 'object' && dateVal.seconds) {
+       d = new Date(dateVal.seconds * 1000);
+    } else {
+       d = new Date(dateVal);
+    }
+    if (!isNaN(d.getTime())) {
+      return includeTime ? d.toLocaleString() : d.toLocaleDateString();
+    }
+  } catch (e) {}
+  return 'N/A';
+};
+
+const getSafeTime = (dateVal: any) => {
+  if (!dateVal) return 0;
+  try {
+    if (typeof dateVal === 'object' && dateVal.seconds) {
+       return dateVal.seconds * 1000;
+    }
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) return d.getTime();
+  } catch (e) {}
+  return 0;
+};
+// --------------------------------------------------
+
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [systemUsers, setSystemUsers] = useState([]); // Base de datos de clientes registrados
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [routes, setRoutes] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [bcvRate, setBcvRate] = useState(36.50);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState<any[]>([]);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -99,29 +129,24 @@ export default function App() {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    const unsubRoutes = onSnapshot(collection(db, 'routes'), (snap) => {
+      setRoutes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     let unsubOrders = () => {};
-    let unsubUsers = () => {};
-    
     if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
-        const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
-          const timeA = a.date && !isNaN(new Date(a.date).getTime()) ? new Date(a.date).getTime() : 0;
-          const timeB = b.date && !isNaN(new Date(b.date).getTime()) ? new Date(b.date).getTime() : 0;
-          return timeB - timeA;
-        });
+        // AQUÍ ESTÁ EL ESCUDO PARA ORDENAMIENTO
+        const sortedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => getSafeTime(b.date) - getSafeTime(a.date));
         setOrders(sortedOrders);
-      });
-
-      unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-        setSystemUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
     }
 
     return () => {
       unsubProducts();
       unsubCategories();
+      unsubRoutes();
       unsubOrders();
-      unsubUsers();
     };
   }, [currentUser]);
 
@@ -130,7 +155,7 @@ export default function App() {
     setCart([]);
   };
 
-  const handleSaveBcvRate = async (newRate) => {
+  const handleSaveBcvRate = async (newRate: number) => {
     if (!newRate || isNaN(newRate)) return;
     try {
       await setDoc(doc(db, 'settings', 'bcv'), { rate: Number(newRate) }, { merge: true });
@@ -164,11 +189,12 @@ export default function App() {
       />
       <main className="flex-grow container mx-auto px-4 py-8 relative">
         {currentUser?.role === 'admin' ? (
-          <AdminDashboard products={products} categories={categories} orders={orders} systemUsers={systemUsers} bcvRate={bcvRate} />
+          <AdminDashboard products={products} categories={categories} routes={routes} orders={orders} bcvRate={bcvRate} />
         ) : (
           <ClientStorefront 
             products={products} 
             categories={categories} 
+            routes={routes}
             cart={cart} 
             setCart={setCart} 
             user={currentUser} 
@@ -182,12 +208,12 @@ export default function App() {
   );
 }
 
-function AuthScreen({ view, setView }) {
+function AuthScreen({ view, setView }: any) {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', address: '' });
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setErrorMsg('');
     setIsLoading(true);
@@ -200,11 +226,10 @@ function AuthScreen({ view, setView }) {
           name: formData.name,
           phone: formData.phone,
           address: formData.address,
-          email: formData.email,
           role: formData.email.toLowerCase().includes('admin') ? 'admin' : 'client'
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       if(error.code === 'auth/invalid-credential') setErrorMsg("Correo o contraseña incorrectos.");
       else if(error.code === 'auth/email-already-in-use') setErrorMsg("Este correo ya está registrado.");
       else setErrorMsg(error.message);
@@ -212,7 +237,7 @@ function AuthScreen({ view, setView }) {
     setIsLoading(false);
   };
 
-  const handleChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
+  const handleChange = (e: any) => setFormData({...formData, [e.target.name]: e.target.value});
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
@@ -278,7 +303,7 @@ function AuthScreen({ view, setView }) {
   );
 }
 
-function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onLoginClick, searchQuery, setSearchQuery, isSearchExpanded, setIsSearchExpanded }) {
+function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onLoginClick, searchQuery, setSearchQuery, isSearchExpanded, setIsSearchExpanded }: any) {
   return (
     <nav className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 print:hidden transition-all">
       <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex justify-between items-center">
@@ -298,7 +323,7 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
                 value={bcvRate} 
                 onChange={(e) => setBcvRate(Number(e.target.value))} 
                 onBlur={(e) => onSaveBcv(Number(e.target.value))}
-                onKeyDown={(e) => e.key === 'Enter' && onSaveBcv(Number(e.target.value))}
+                onKeyDown={(e) => e.key === 'Enter' && onSaveBcv(Number((e.target as HTMLInputElement).value))}
                 className="w-12 sm:w-16 text-[10px] sm:text-xs px-1 border-b border-green-300 bg-transparent outline-none font-bold text-green-900 focus:border-green-500" 
               />
             ) : (
@@ -371,7 +396,7 @@ function Footer() {
 }
 
 // --- ADMIN COMPONENTS ---
-function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) {
+function AdminDashboard({ products, categories, routes, orders, bcvRate }: any) {
   const [activeTab, setActiveTab] = useState('orders');
 
   return (
@@ -390,323 +415,40 @@ function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) 
             <button onClick={() => setActiveTab('kpis')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'kpis' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingUp className="w-5 h-5" /> Dashboard</button>
             <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'orders' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}>
               <ShoppingBag className="w-5 h-5" /> Pedidos 
-              {orders.filter((o)=>o.status==='Pendiente').length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{orders.filter((o)=>o.status==='Pendiente').length}</span>}
+              {orders.filter((o:any)=>o.status==='Pendiente').length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{orders.filter((o:any)=>o.status==='Pendiente').length}</span>}
             </button>
-            
-            <button onClick={() => setActiveTab('delivery')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> Rutas de Entrega</button>
             <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'customers' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
             
             <div className="pt-4 mt-4 border-t border-stone-100"></div>
             
             <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
             <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
+            <button onClick={() => setActiveTab('routes')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'routes' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><MapPin className="w-5 h-5" /> Rutas / Envíos</button>
           </nav>
         </div>
       </div>
 
       <div className="flex-1 min-w-0">
         {activeTab === 'kpis' && <AdminKPIs orders={orders} bcvRate={bcvRate} />}
-        {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
-        {activeTab === 'delivery' && <AdminDeliveryRoute orders={orders} bcvRate={bcvRate} />}
-        {activeTab === 'customers' && <AdminCustomers orders={orders} systemUsers={systemUsers} />}
+        {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} routes={routes} />}
+        {activeTab === 'customers' && <AdminCustomers orders={orders} />}
         {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
         {activeTab === 'categories' && <AdminCategories categories={categories} />}
+        {activeTab === 'routes' && <AdminRoutes routes={routes} />}
       </div>
     </div>
   );
 }
 
-// --- MÓDULO REDISEÑADO: RUTAS DE ENTREGA DINÁMICO ---
-function AdminDeliveryRoute({ orders, bcvRate }) {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedShift, setSelectedShift] = useState('Todos');
-  const [routeIds, setRouteIds] = useState([]);
-
-  useEffect(() => {
-    setRouteIds([]);
-  }, [selectedDate, selectedShift]);
-
-  const filteredOrders = orders.filter(o => {
-    if (o.status === 'Cancelado') return false; 
-    
-    // Extracción segura de la fecha
-    let orderDate = o.deliveryDate || '';
-    if (!orderDate && o.date) {
-      try {
-        const d = new Date(o.date);
-        if(!isNaN(d.getTime())) orderDate = d.toISOString().split('T')[0];
-      } catch(e) {}
-    }
-
-    if (orderDate !== selectedDate) return false;
-
-    if (selectedShift !== 'Todos') {
-      const orderShift = o.deliveryTimeSlot || '';
-      if (selectedShift === 'Mañana' && !orderShift.includes('Mañana')) return false;
-      if (selectedShift === 'Tarde' && !orderShift.includes('Tarde')) return false;
-    }
-    return true;
-  });
-
-  const routeOrders = routeIds.map(id => filteredOrders.find(o => o.id === id)).filter(Boolean);
-  const availableOrders = filteredOrders.filter(o => !routeIds.includes(o.id));
-
-  const addToRoute = (id) => setRouteIds([...routeIds, id]);
-  const removeFromRoute = (id) => setRouteIds(routeIds.filter(routeId => routeId !== id));
-
-  const moveOrder = (index, direction) => {
-    if (direction === -1 && index === 0) return;
-    if (direction === 1 && index === routeIds.length - 1) return;
-    const newRouteIds = [...routeIds];
-    const temp = newRouteIds[index];
-    newRouteIds[index] = newRouteIds[index + direction];
-    newRouteIds[index + direction] = temp;
-    setRouteIds(newRouteIds);
-  };
-
-  const calculateBalance = (order) => {
-    const totalPaid = (order.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
-    const orderTotal = Number(order.totalUSD) || 0;
-    return Math.max(0, orderTotal - totalPaid);
-  };
-
-  const handleUpdateStatus = async (id, newStatus) => {
-    await updateDoc(doc(db, 'orders', id), { status: newStatus });
-  };
-
-  const generateWhatsAppMessage = () => {
-    if (routeOrders.length === 0) return alert("No has añadido pedidos a la ruta actual.");
-
-    let msg = `🚚 *RUTA DE ENTREGA DECOMER* 🚚\n`;
-    msg += `📅 *Fecha:* ${selectedDate.split('-').reverse().join('/')}\n`;
-    msg += `⏰ *Turno:* ${selectedShift}\n\n`;
-
-    routeOrders.forEach((order, index) => {
-      const balance = calculateBalance(order);
-      
-      msg += `*📍 PARADA ${index + 1}:* ${order.displayId || 'PED'}\n`;
-      msg += `👤 *Recibe:* ${order.recipientName || order.customerName || 'N/A'}\n`;
-      msg += `📞 *Teléfono:* ${order.recipientPhone || order.phone || order.senderPhone || 'N/A'}\n`;
-      msg += `🏠 *Dirección:* ${order.deliveryAddress || order.address || 'N/A'}\n`;
-      
-      const itemsList = order.items.map(i => `${i.quantity}x ${i.name}`).join(', ');
-      msg += `📦 *Entregar:* ${itemsList}\n`;
-
-      if (balance > 0) {
-        msg += `\n💰 ⚠️ *¡¡ATENCIÓN!! COBRAR AL ENTREGAR:* ⚠️\n`;
-        msg += `💵 Monto: *$${balance.toFixed(2)} USD*\n`;
-        msg += `🇻🇪 En Bs: *Bs. ${(balance * bcvRate).toFixed(2)}*\n`;
-      } else {
-        msg += `\n✅ *PAGADO* (Solo entregar)\n`;
-      }
-      msg += `--------------------------\n\n`;
-    });
-
-    msg += `*Conduce con cuidado.* 🍓🍫`;
-
-    const encodedMsg = encodeURIComponent(msg);
-    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-  };
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Map className="w-6 h-6 text-red-600"/> Constructor de Rutas</h2>
-        <p className="text-stone-500">Selecciona los pedidos y arma la ruta específica para un motorizado.</p>
-      </div>
-
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 items-end">
-        <div className="flex flex-col md:flex-row gap-4 w-full">
-          <div className="flex-1">
-            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">1. Selecciona la Fecha</label>
-            <input 
-              type="date" 
-              value={selectedDate} 
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:border-red-500 text-sm font-bold text-gray-800 w-full"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">2. Selecciona el Turno</label>
-            <div className="flex bg-stone-100 p-1 rounded-xl w-full">
-              {['Todos', 'Mañana', 'Tarde'].map(shift => (
-                <button 
-                  key={shift} 
-                  onClick={() => setSelectedShift(shift)}
-                  className={`flex-1 px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${selectedShift === shift ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
-                >
-                  {shift}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-3xl shadow-sm border border-stone-200 flex flex-col max-h-[800px]">
-          <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center rounded-t-3xl shrink-0">
-            <div>
-              <h3 className="font-bold text-stone-700 text-sm flex items-center gap-2"><Package className="w-4 h-4"/> Pedidos Disponibles</h3>
-              <p className="text-[10px] text-stone-500 mt-0.5">Pendientes por asignar ({availableOrders.length})</p>
-            </div>
-          </div>
-          <div className="overflow-y-auto p-3 space-y-3 flex-grow bg-stone-50/50">
-            {availableOrders.length === 0 ? (
-              <div className="p-10 text-center text-stone-400">
-                <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p className="font-medium text-sm">No hay pedidos pendientes para este filtro.</p>
-              </div>
-            ) : (
-              availableOrders.map(order => {
-                const balance = calculateBalance(order);
-                return (
-                  <div key={order.id} className="bg-white border border-stone-200 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col gap-3 relative">
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <span className="font-black text-gray-900 text-base">{order.displayId}</span>
-                        <p className="text-xs font-bold text-gray-700 mt-1">{order.recipientName || order.customerName}</p>
-                      </div>
-                      <button 
-                        onClick={() => addToRoute(order.id)}
-                        className="bg-stone-900 hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Añadir a Ruta
-                      </button>
-                    </div>
-                    
-                    <p className="text-xs text-stone-500 leading-relaxed line-clamp-2">
-                      <span className="font-bold">Dir:</span> {order.deliveryAddress || order.address}
-                    </p>
-                    
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
-                      {balance > 0 ? (
-                        <span className="bg-red-50 text-red-600 px-2 py-1 rounded-md text-[10px] font-black border border-red-100">
-                          COBRAR: ${balance.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="bg-green-50 text-green-600 px-2 py-1 rounded-md text-[10px] font-black border border-green-100">
-                          PAGADO
-                        </span>
-                      )}
-                      <span className="text-[10px] font-bold text-stone-400 truncate max-w-[150px]">
-                        {order.items.length} items
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-lg border-2 border-green-500 flex flex-col max-h-[800px] relative overflow-hidden">
-          <div className="p-4 bg-green-50 border-b border-green-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
-            <div>
-              <h3 className="font-black text-green-800 text-base flex items-center gap-2"><Truck className="w-5 h-5"/> Ruta a Enviar ({routeOrders.length})</h3>
-              <p className="text-[10px] text-green-600/80 mt-0.5 font-bold uppercase tracking-wider">Ordena las paradas y genera el mensaje</p>
-            </div>
-            
-            <div className="flex gap-2 w-full sm:w-auto">
-              {routeOrders.length > 0 && (
-                <button 
-                  onClick={() => setRouteIds([])}
-                  className="bg-white border border-red-200 text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors shrink-0"
-                  title="Limpiar Ruta"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-              <button 
-                onClick={generateWhatsAppMessage}
-                disabled={routeOrders.length === 0}
-                className="bg-[#25D366] hover:bg-[#1ebd5a] disabled:bg-stone-300 disabled:border-stone-300 border border-[#1ebd5a] text-white px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 flex-1 sm:flex-none"
-              >
-                <Share2 className="w-4 h-4" /> Enviar Ruta
-              </button>
-            </div>
-          </div>
-
-          <div className="overflow-y-auto flex-grow bg-white">
-            {routeOrders.length === 0 ? (
-              <div className="p-12 text-center text-green-600/40 flex flex-col items-center justify-center h-full">
-                <Map className="w-16 h-16 mb-4 opacity-50" />
-                <p className="font-bold text-sm">La ruta está vacía.</p>
-                <p className="text-xs mt-1 max-w-[200px]">Añade pedidos desde el panel izquierdo para armar el recorrido.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-stone-100">
-                {routeOrders.map((order, index) => {
-                  const balance = calculateBalance(order);
-                  return (
-                    <div key={order.id} className="p-4 flex gap-3 hover:bg-green-50/30 transition-colors">
-                      <div className="flex flex-col gap-1 shrink-0 bg-stone-50 p-1 rounded-xl h-fit border border-stone-100">
-                        <button onClick={() => moveOrder(index, -1)} disabled={index === 0} className="p-1 text-stone-400 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded transition-colors"><ArrowUp className="w-4 h-4"/></button>
-                        <div className="w-6 h-6 flex items-center justify-center font-black text-green-700 bg-green-100 rounded text-xs">{index + 1}</div>
-                        <button onClick={() => moveOrder(index, 1)} disabled={index === routeOrders.length - 1} className="p-1 text-stone-400 hover:bg-white hover:text-gray-800 disabled:opacity-30 rounded transition-colors"><ArrowDown className="w-4 h-4"/></button>
-                      </div>
-
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="font-black text-gray-900 block leading-none">{order.displayId}</span>
-                            <span className="text-xs font-bold text-stone-500">{order.recipientName || order.customerName}</span>
-                          </div>
-                          <button 
-                            onClick={() => removeFromRoute(order.id)}
-                            className="text-stone-400 hover:text-red-500 bg-stone-50 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                            title="Quitar de esta ruta"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        
-                        <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
-                          {order.deliveryAddress || order.address}
-                        </p>
-                        
-                        <div className="flex justify-between items-center bg-stone-50 p-2 rounded-lg border border-stone-100">
-                          {balance > 0 ? (
-                            <span className="text-red-600 text-[10px] font-black flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3" /> COBRAR ${balance.toFixed(2)}
-                            </span>
-                          ) : (
-                            <span className="text-green-600 text-[10px] font-black">PAGADO</span>
-                          )}
-                          
-                          <select 
-                            value={order.status}
-                            onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
-                            className="text-[10px] font-bold uppercase tracking-wider bg-transparent border-none outline-none cursor-pointer text-stone-500 text-right text-ellipsis w-24"
-                          >
-                            <option value="En Preparación">En Prep.</option>
-                            <option value="Abonado">Abonado</option>
-                            <option value="Pagado">Pagado</option>
-                            <option value="Completado">✓ Entregado</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminKPIs({ orders, bcvRate }) {
+function AdminKPIs({ orders, bcvRate }: any) {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
   const todayStr = now.toLocaleDateString();
 
-  const validOrders = orders.filter((o) => o.status !== 'Cancelado');
+  const validOrders = orders.filter((o: any) => o.status !== 'Cancelado');
   
-  const monthOrders = validOrders.filter((o) => {
+  const monthOrders = validOrders.filter((o: any) => {
     if(!o.date) return false;
     try {
       const d = new Date(o.date);
@@ -715,7 +457,7 @@ function AdminKPIs({ orders, bcvRate }) {
     } catch { return false; }
   });
 
-  const todayOrders = validOrders.filter((o) => {
+  const todayOrders = validOrders.filter((o: any) => {
     if(!o.date) return false;
     try {
       const d = new Date(o.date);
@@ -724,12 +466,12 @@ function AdminKPIs({ orders, bcvRate }) {
     } catch { return false; }
   });
 
-  const monthSalesUSD = monthOrders.reduce((sum, o) => sum + (Number(o.totalUSD) || 0), 0);
-  const todaySalesUSD = todayOrders.reduce((sum, o) => sum + (Number(o.totalUSD) || 0), 0);
-  const totalHistóricoUSD = validOrders.reduce((sum, o) => sum + (Number(o.totalUSD) || 0), 0);
+  const monthSalesUSD = monthOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
+  const todaySalesUSD = todayOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
+  const totalHistóricoUSD = validOrders.reduce((sum: any, o: any) => sum + (Number(o.totalUSD) || 0), 0);
   
-  const pendientes = orders.filter((o) => o.status === 'Pendiente').length;
-  const enPrep = orders.filter((o) => o.status === 'En Preparación').length;
+  const pendientes = orders.filter((o: any) => o.status === 'Pendiente').length;
+  const enPrep = orders.filter((o: any) => o.status === 'En Preparación').length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -792,253 +534,169 @@ function AdminKPIs({ orders, bcvRate }) {
   );
 }
 
-// --- MÓDULO REDISEÑADO CON BLINDAJE EXTREMO ---
-function AdminCustomers({ orders, systemUsers }) {
+function AdminCustomers({ orders }: any) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Envolvermos TODO el componente en un Try/Catch.
-  // Si la base de datos envía basura u ocurre un error, muestra una cajita roja en lugar de pantalla negra.
-  try {
-    const clientMap = new Map();
+  const clientMap = new Map();
+  
+  orders.forEach((order: any) => {
+    if(order.status === 'Cancelado') return;
 
-    // 1. Agregar a los usuarios registrados en la plataforma (Solución: "no está mirando para donde es")
-    if (Array.isArray(systemUsers)) {
-      systemUsers.forEach(u => {
-        if (u.role === 'admin') return; // Omitimos admins
-        
-        const name = String(u.name || 'Usuario Sin Nombre').trim();
-        const phone = String(u.phone || 'Sin Teléfono').trim();
-        
-        const key = (phone && phone !== 'Sin Teléfono' && phone !== 'undefined') ? phone : name.toLowerCase();
+    const name = String(order.senderName || order.customerName || 'Cliente Anónimo');
+    const phone = String(order.senderPhone || order.phone || 'Sin Teléfono');
+    
+    const key = phone !== 'Sin Teléfono' ? phone : name.toLowerCase();
 
-        clientMap.set(key, {
-          name: name,
-          phone: phone,
-          address: String(u.address || ''),
-          totalOrders: 0,
-          totalSpent: 0,
-          lastOrder: null,
-          isRegistered: true // Etiqueta especial
-        });
+    if (!clientMap.has(key)) {
+      clientMap.set(key, { 
+        name, 
+        phone, 
+        totalOrders: 0, 
+        totalSpent: 0, 
+        lastOrder: order.date 
       });
     }
-
-    // 2. Escanear el historial de pedidos y combinar la información
-    if (Array.isArray(orders)) {
-      orders.forEach(order => {
-        if (!order || order.status === 'Cancelado') return;
-
-        // Escaneo profundo para buscar el nombre
-        const rawName = order.senderName || order.customerName || order.name || order.recipientName || 'Cliente Anónimo';
-        const rawPhone = order.senderPhone || order.phone || order.recipientPhone || 'Sin Teléfono';
-
-        const name = String(rawName).trim();
-        const phone = String(rawPhone).trim();
-
-        const key = (phone && phone !== 'Sin Teléfono' && phone !== 'undefined') ? phone : name.toLowerCase();
-
-        if (!clientMap.has(key)) {
-          clientMap.set(key, {
-            name: name,
-            phone: phone,
-            address: String(order.deliveryAddress || order.address || ''),
-            totalOrders: 0,
-            totalSpent: 0,
-            lastOrder: null,
-            isRegistered: false
-          });
-        }
-
-        const client = clientMap.get(key);
-        client.totalOrders += 1;
-        client.totalSpent += (Number(order.totalUSD) || 0);
-
-        // Actualizar la fecha del último pedido
-        if (order.date) {
-          if (!client.lastOrder) {
-            client.lastOrder = order.date;
-          } else {
-            const newD = new Date(order.date);
-            const oldD = new Date(client.lastOrder);
-            if (!isNaN(newD.getTime()) && !isNaN(oldD.getTime()) && newD > oldD) {
-              client.lastOrder = order.date;
-              // Actualiza el nombre solo si no es un usuario registrado (los registrados tienen nombre fijo)
-              if (!client.isRegistered) client.name = name; 
-            }
-          }
-        }
-      });
+    
+    const client = clientMap.get(key);
+    client.totalOrders += 1;
+    client.totalSpent += (Number(order.totalUSD) || 0);
+    
+    // AQUÍ ESTÁ EL ESCUDO PARA MIS CLIENTES
+    const timeOrder = getSafeTime(order.date);
+    const timeClient = getSafeTime(client.lastOrder);
+    if (timeOrder > timeClient && timeOrder > 0) {
+      client.lastOrder = order.date;
+      client.name = name; 
     }
+  });
 
-    // Convertir a Array y ordenar (Primero por gasto, luego por registrados)
-    const allCustomers = Array.from(clientMap.values()).sort((a, b) => {
-       const diff = (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0);
-       if (diff !== 0) return diff;
-       return (b.isRegistered ? 1 : 0) - (a.isRegistered ? 1 : 0);
-    });
+  const allCustomers = Array.from(clientMap.values()).sort((a: any, b: any) => b.totalSpent - a.totalSpent);
 
-    const filteredCustomers = allCustomers.filter(c => {
-      const term = String(searchTerm || '').toLowerCase();
-      return String(c.name || '').toLowerCase().includes(term) || String(c.phone || '').toLowerCase().includes(term);
-    });
+  const filteredCustomers = allCustomers.filter(c => 
+    String(c.name).toLowerCase().includes(searchTerm.toLowerCase()) || 
+    String(c.phone).includes(searchTerm)
+  );
 
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
-            <p className="text-stone-500 text-sm mt-1">Sincronizado con usuarios web e historial de compras</p>
-          </div>
-          
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-            <input 
-              type="text" 
-              placeholder="Buscar cliente o tlf..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-stone-200 rounded-xl outline-none focus:border-blue-500 text-sm shadow-sm bg-white"
-            />
-          </div>
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
+          <p className="text-stone-500 text-sm mt-1">Generado automáticamente según el historial de compras ({allCustomers.length} registrados)</p>
         </div>
+        
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <input 
+            type="text" 
+            placeholder="Buscar cliente o tlf..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border border-stone-200 rounded-xl outline-none focus:border-blue-500 text-sm shadow-sm"
+          />
+        </div>
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
-                  <th className="p-4 font-bold">Cliente</th>
-                  <th className="p-4 font-bold text-center">Pedidos</th>
-                  <th className="p-4 font-bold">Total Invertido</th>
-                  <th className="p-4 font-bold hidden sm:table-cell">Última Compra</th>
-                  <th className="p-4 font-bold text-right">Contacto</th>
+      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
+                <th className="p-4 font-bold">Cliente</th>
+                <th className="p-4 font-bold text-center">Pedidos</th>
+                <th className="p-4 font-bold">Total Invertido</th>
+                <th className="p-4 font-bold hidden sm:table-cell">Última Compra</th>
+                <th className="p-4 font-bold text-right">Contacto</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {filteredCustomers.map((client: any, idx: number) => (
+                <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                  <td className="p-4">
+                    <p className="font-bold text-gray-900">{client.name}</p>
+                    <p className="text-xs text-stone-500 font-medium">{client.phone}</p>
+                  </td>
+                  <td className="p-4 text-center">
+                    <span className="bg-stone-100 text-stone-700 font-bold px-3 py-1 rounded-full text-xs">
+                      {client.totalOrders}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <p className="font-black text-green-600">${Number(client.totalSpent).toFixed(2)}</p>
+                  </td>
+                  <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
+                    {/* AQUÍ ESTÁ EL ESCUDO DE RENDERIZADO */}
+                    {safeFormatDate(client.lastOrder)}
+                  </td>
+                  <td className="p-4 text-right">
+                    {client.phone !== 'Sin Teléfono' && (
+                      <a 
+                        href={`https://wa.me/${client.phone.replace(/\D/g,'')}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-[#25D366]/10 text-[#1ebd5a] hover:bg-[#25D366] hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                      >
+                        <MessageCircle className="w-4 h-4" /> Escribir
+                      </a>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {filteredCustomers.map((client, idx) => (
-                  <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="p-4">
-                      <p className="font-bold text-gray-900 flex items-center flex-wrap gap-2">
-                        {client.name}
-                        {client.isRegistered && <span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md font-bold border border-blue-200 uppercase">Web</span>}
-                      </p>
-                      <p className="text-xs text-stone-500 font-medium mt-0.5">{client.phone}</p>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="bg-stone-100 text-stone-700 font-bold px-3 py-1 rounded-full text-xs">
-                        {client.totalOrders}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <p className="font-black text-green-600">${client.totalSpent.toFixed(2)}</p>
-                    </td>
-                    <td className="p-4 hidden sm:table-cell text-sm text-stone-500">
-                      {client.lastOrder ? (() => {
-                        try {
-                          const d = new Date(client.lastOrder);
-                          return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
-                        } catch { return 'N/A'; }
-                      })() : 'N/A'}
-                    </td>
-                    <td className="p-4 text-right">
-                      {client.phone && client.phone !== 'Sin Teléfono' && client.phone !== 'undefined' && (
-                        <a 
-                          href={`https://wa.me/${String(client.phone).replace(/\D/g,'')}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 bg-[#25D366]/10 text-[#1ebd5a] hover:bg-[#25D366] hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                        >
-                          <MessageCircle className="w-4 h-4" /> Escribir
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {filteredCustomers.length === 0 && (
-                  <tr><td colSpan="5" className="p-8 text-center text-stone-500">No se encontraron clientes registrados ni en historial de compras.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+              {filteredCustomers.length === 0 && (
+                <tr><td colSpan="5" className="p-8 text-center text-stone-500">No se encontraron clientes.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
-    );
-  } catch (error) {
-    // ESTO ES EL ESCUDO ANTI-PANTALLA NEGRA
-    // Si la base de datos envía un dato totalmente roto, en vez de colapsar la app, muestra esto:
-    console.error("Error Crítico Interceptado en Directorio de Clientes:", error);
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Directorio de Clientes</h2>
-        <div className="p-8 bg-red-50 border border-red-200 rounded-3xl text-center shadow-inner">
-          <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4 opacity-80" />
-          <h3 className="text-xl font-bold text-red-800 mb-2">Se bloqueó un fallo en la pantalla</h3>
-          <p className="text-red-600 font-medium max-w-md mx-auto mb-4">
-            El sistema detectó un registro corrupto y detuvo la carga de la tabla para evitar que toda la aplicación colapsara (Pantalla Negra interceptada).
-          </p>
-          <div className="bg-white p-3 rounded-xl border border-red-100 text-xs text-red-800 font-mono inline-block text-left">
-            Error original: {error.message}
-          </div>
-        </div>
-      </div>
-    );
-  }
+    </div>
+  );
 }
 
-function AdminOrders({ orders, bcvRate, products }) {
+function AdminOrders({ orders, bcvRate, products, routes }: any) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
 
-  // Modal Pago
-  const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null });
-  const [paymentForm, setPaymentForm] = useState({ 
-    method: 'Pago Móvil', inputAmount: '', inputCurrency: 'BS', customBcvRate: bcvRate, 
-    reference: '', bank: VENEZUELAN_BANKS[0], phone: '', accountName: '', notes: '' 
-  });
-  
-  const [viewPaymentsModal, setViewPaymentsModal] = useState({ isOpen: false, orderId: null });
-  const [receiptModal, setReceiptModal] = useState({ isOpen: false, order: null });
+  const [paymentModal, setPaymentModal] = useState<any>({ isOpen: false, orderId: null });
+  const [paymentForm, setPaymentForm] = useState({ method: 'Pago Móvil', reference: '', phone: '', bank: VENEZUELAN_BANKS[0], amountUSD: '' as string | number });
+  const [viewPaymentsModal, setViewPaymentsModal] = useState<any>({ isOpen: false, order: null });
+  const [receiptModal, setReceiptModal] = useState<any>({ isOpen: false, order: null });
 
-  // Modal Pedido Manual / Edición
-  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [editOrderId, setEditOrderId] = useState(null);
-  const [manualOrder, setManualOrder] = useState({ 
-    senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', 
-    deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] 
-  });
+  const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
+  const [manualOrder, setManualOrder] = useState({ customerName: '', phone: '', address: '', notes: '', items: [] as any[] });
   const [manualProduct, setManualProduct] = useState('');
-  const [manualQty, setManualQty] = useState(1);
+  const [manualQty, setManualQty] = useState<string | number>(1);
+  const [manualDeliveryFee, setManualDeliveryFee] = useState<string | number>(0);
 
-  const handleStatusChange = async (id, newStatus) => {
+  const handleStatusChange = async (id: string, newStatus: string) => {
     await updateDoc(doc(db, 'orders', id), { status: newStatus });
   };
 
-  const openPaymentModal = (order) => {
-    setPaymentForm({ 
-      method: 'Pago Móvil', inputAmount: '', inputCurrency: 'BS', customBcvRate: bcvRate, 
-      reference: '', bank: VENEZUELAN_BANKS[0], phone: '', accountName: '', notes: '' 
-    });
+  const openPaymentModal = (order: any) => {
+    const totalPaid = (order.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amountUSD) || 0), 0);
+    const orderTotal = Number(order.totalUSD) || 0;
+    const balance = orderTotal - totalPaid;
+    setPaymentForm({ method: 'Pago Móvil', reference: '', phone: '', bank: VENEZUELAN_BANKS[0], amountUSD: balance > 0 ? balance : 0 });
     setPaymentModal({ isOpen: true, orderId: order.id });
   };
 
-  const handleRegisterPayment = async (e) => {
+  const handleRegisterPayment = async (e: any) => {
     e.preventDefault();
-    const order = orders.find((o) => o.id === paymentModal.orderId);
+    const order = orders.find((o: any) => o.id === paymentModal.orderId);
     if (!order) return;
 
-    const rateToUse = Number(paymentForm.customBcvRate) || bcvRate;
-    const amountUSDToSave = paymentForm.inputCurrency === 'BS' ? Number(paymentForm.inputAmount) / rateToUse : Number(paymentForm.inputAmount);
-
-    if (!amountUSDToSave || amountUSDToSave <= 0) return alert("Ingresa un monto válido");
-
-    let detailsStr = '';
-    if (['Pago Móvil', 'Transferencia Bs'].includes(paymentForm.method)) detailsStr = `Banco: ${paymentForm.bank} - Tlf: ${paymentForm.phone}`;
-    else if (['Zelle', 'Zinli', 'Binance'].includes(paymentForm.method)) detailsStr = `Titular/Cuenta: ${paymentForm.accountName}`;
-    else if (paymentForm.method === 'Efectivo Divisas') detailsStr = paymentForm.notes ? `Notas: ${paymentForm.notes}` : '';
-
-    const newPayment = { method: paymentForm.method, reference: paymentForm.reference || '', amountUSD: amountUSDToSave, details: detailsStr, date: new Date().toISOString() };
+    const newPayment = {
+      method: paymentForm.method,
+      reference: paymentForm.reference,
+      amountUSD: Number(paymentForm.amountUSD),
+      details: (paymentForm.method === 'Pago Móvil' || paymentForm.method === 'Transferencia Bs') 
+               ? `Origen: ${paymentForm.bank} - Tlf: ${paymentForm.phone}` 
+               : (paymentForm.bank && ['Zelle', 'Zinli', 'Binance'].includes(paymentForm.method) ? `Origen: ${paymentForm.bank}` : ''),
+      date: new Date().toISOString()
+    };
+    
     const updatedPayments = [...(order.payments || []), newPayment];
-    const totalPaid = updatedPayments.reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
+    const totalPaid = updatedPayments.reduce((sum: number, p: any) => sum + (Number(p.amountUSD) || 0), 0);
     const orderTotal = Number(order.totalUSD) || 0;
     
     let newStatus = order.status;
@@ -1046,58 +704,19 @@ function AdminOrders({ orders, bcvRate, products }) {
     else if (totalPaid > 0 && totalPaid < orderTotal && order.status === 'Pendiente') newStatus = 'Abonado';
 
     await updateDoc(doc(db, 'orders', order.id), { status: newStatus, payments: updatedPayments });
-    setPaymentModal({ isOpen: false, orderId: null });
-  };
-
-  const handleDeletePayment = async (orderId, paymentIndex) => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-    if (!window.confirm("¿Estás seguro de que deseas eliminar este pago? Esta acción no se puede deshacer.")) return;
-
-    const updatedPayments = [...(order.payments || [])];
-    updatedPayments.splice(paymentIndex, 1);
-    const totalPaid = updatedPayments.reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
-    const orderTotal = Number(order.totalUSD) || 0;
-
-    let newStatus = order.status;
-    if (updatedPayments.length === 0) newStatus = 'Pendiente';
-    else if (totalPaid >= orderTotal) newStatus = 'Pagado';
-    else newStatus = 'Abonado';
-
-    await updateDoc(doc(db, 'orders', order.id), { payments: updatedPayments, status: newStatus });
-  };
-
-  const openCreateModal = () => {
-    setEditOrderId(null);
-    setManualOrder({ senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] });
-    setIsOrderModalOpen(true);
-  };
-
-  const openEditModal = (order) => {
-    setEditOrderId(order.id);
-    setManualOrder({
-      senderName: order.senderName || order.customerName || '',
-      senderPhone: order.senderPhone || order.phone || '',
-      recipientName: order.recipientName || '',
-      recipientPhone: order.recipientPhone || '',
-      deliveryAddress: order.deliveryAddress || order.address || '',
-      deliveryDate: order.deliveryDate || '',
-      deliveryTimeSlot: order.deliveryTimeSlot || 'Mañana (8:00 AM - 12:00 PM)',
-      dedication: order.dedication || '',
-      items: order.items || []
-    });
-    setIsOrderModalOpen(true);
-  };
-
-  const closeOrderModal = () => {
-    setIsOrderModalOpen(false);
-    setEditOrderId(null);
+    
+    const newBalance = orderTotal - totalPaid;
+    if (newBalance > 0) {
+      setPaymentForm({ ...paymentForm, reference: '', amountUSD: newBalance, phone: '', bank: VENEZUELAN_BANKS[0] });
+    } else {
+      setPaymentModal({ isOpen: false, orderId: null });
+    }
   };
 
   const handleAddManualItem = () => {
     const productId = manualProduct || (products.length > 0 ? products[0].id : null);
     if (!productId) return;
-    const product = products.find((p) => p.id === productId);
+    const product = products.find((p: any) => p.id === productId);
     if (!product) return;
     
     const existingIndex = manualOrder.items.findIndex(i => i.id === product.id);
@@ -1108,57 +727,38 @@ function AdminOrders({ orders, bcvRate, products }) {
     setManualQty(1);
   };
   
-  const handleRemoveManualItem = (index) => {
+  const handleRemoveManualItem = (index: number) => {
     const newItems = [...manualOrder.items];
     newItems.splice(index, 1);
     setManualOrder({ ...manualOrder, items: newItems });
   };
 
-  const handleSaveOrder = async (e) => {
+  const handleCreateManualOrder = async (e: any) => {
     e.preventDefault();
     if (manualOrder.items.length === 0) return alert("Debes agregar al menos un producto.");
-    const totalUSD = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
-    
-    const orderData = {
-      senderName: manualOrder.senderName,
-      senderPhone: manualOrder.senderPhone,
-      recipientName: manualOrder.recipientName,
-      recipientPhone: manualOrder.recipientPhone,
-      deliveryAddress: manualOrder.deliveryAddress,
-      deliveryDate: manualOrder.deliveryDate,
-      deliveryTimeSlot: manualOrder.deliveryTimeSlot,
-      dedication: manualOrder.dedication,
+    const productsTotal = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
+    const totalUSD = productsTotal + Number(manualDeliveryFee);
+
+    await addDoc(collection(db, 'orders'), {
+      displayId: `PED-M${Math.floor(Math.random() * 10000)}`,
+      customerName: manualOrder.customerName,
       items: manualOrder.items,
+      deliveryFee: Number(manualDeliveryFee),
+      deliveryRouteName: Number(manualDeliveryFee) > 0 ? 'Delivery (Manual)' : 'N/A',
       totalUSD: totalUSD,
-      customerName: manualOrder.senderName,
-      phone: manualOrder.senderPhone,
-      address: manualOrder.deliveryAddress
-    };
-
-    if (editOrderId) {
-      const existingOrder = orders.find(o => o.id === editOrderId);
-      const totalPaid = (existingOrder.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
-      let newStatus = existingOrder.status;
-
-      if (totalPaid >= totalUSD && totalUSD > 0) newStatus = 'Pagado';
-      else if (totalPaid > 0 && totalPaid < totalUSD) newStatus = 'Abonado';
-      else if (totalPaid === 0 && newStatus === 'Pagado') newStatus = 'Pendiente';
-
-      await updateDoc(doc(db, 'orders', editOrderId), { ...orderData, status: newStatus });
-    } else {
-      await addDoc(collection(db, 'orders'), {
-        ...orderData,
-        displayId: `PED-M${Math.floor(Math.random() * 10000)}`,
-        status: 'Pendiente',
-        payments: [],
-        date: new Date().toISOString()
-      });
-    }
-    
-    closeOrderModal();
+      status: 'Pendiente',
+      payments: [],
+      date: new Date().toISOString(),
+      notes: manualOrder.notes,
+      phone: manualOrder.phone,
+      address: manualOrder.address
+    });
+    setIsManualOrderOpen(false);
+    setManualOrder({ customerName: '', phone: '', address: '', notes: '', items: [] });
+    setManualDeliveryFee(0);
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch(status) {
       case 'Pendiente': return 'bg-orange-100 text-orange-700';
       case 'Abonado': return 'bg-yellow-100 text-yellow-700';
@@ -1170,9 +770,14 @@ function AdminOrders({ orders, bcvRate, products }) {
     }
   };
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch = String(order.displayId || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(order.customerName || order.senderName || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(order.phone || order.senderPhone || '').includes(searchTerm);
+  const filteredOrders = orders.filter((order: any) => {
+    const matchesSearch = 
+      String(order.displayId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(order.customerName || order.senderName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(order.phone || order.senderPhone || '').includes(searchTerm);
+      
     const matchesStatus = statusFilter === 'Todos' || order.status === statusFilter;
+    
     return matchesSearch && matchesStatus;
   });
 
@@ -1183,8 +788,8 @@ function AdminOrders({ orders, bcvRate, products }) {
           <h2 className="text-2xl font-bold text-gray-800">Control de Pedidos</h2>
           <p className="text-stone-500">Gestiona entregas y cobros</p>
         </div>
-        <button onClick={openCreateModal} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg hover:shadow-xl text-sm">
-          <Plus className="w-5 h-5" /> Nuevo Pedido Manual
+        <button onClick={() => setIsManualOrderOpen(true)} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg hover:shadow-xl text-sm">
+          <Plus className="w-5 h-5" /> Nuevo Pedido
         </button>
       </div>
 
@@ -1225,25 +830,17 @@ function AdminOrders({ orders, bcvRate, products }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
-            {filteredOrders.map((order) => {
-              const totalPaid = (order.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
+            {filteredOrders.map((order: any) => {
+              const totalPaid = (order.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amountUSD) || 0), 0);
               const orderTotal = Number(order.totalUSD) || 0;
               const balance = orderTotal - totalPaid;
-              
-              // Validación segura de fecha
-              let dateStr = 'N/A';
-              if (order.date) {
-                 try {
-                     const d = new Date(order.date);
-                     if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString();
-                 } catch { /* ignore */ }
-              }
               
               return (
               <tr key={order.id} className="hover:bg-stone-50/50 transition-colors">
                 <td className="p-4">
                   <div className="font-black text-gray-900">{order.displayId || 'PED-WEB'}</div>
-                  <div className="text-xs text-stone-500 font-medium">{dateStr}</div>
+                  {/* AQUÍ ESTÁ EL ESCUDO DE RENDERIZADO PARA LA TABLA */}
+                  <div className="text-xs text-stone-500 font-medium">{safeFormatDate(order.date)}</div>
                 </td>
                 <td className="p-4 text-sm text-gray-700">
                   <div className="font-bold flex items-center gap-1"><User className="w-3 h-3 text-stone-400"/> {order.senderName || order.customerName}</div>
@@ -1258,14 +855,14 @@ function AdminOrders({ orders, bcvRate, products }) {
                     <div className="mb-1">
                       <span className="text-green-600 font-black">${totalPaid.toFixed(2)} Pagado</span>
                       {balance > 0 && <span className="text-red-500 ml-2 text-xs font-bold bg-red-50 px-1 rounded block mt-1 w-max">Deuda: ${balance.toFixed(2)}</span>}
-                      <button onClick={() => setViewPaymentsModal({ isOpen: true, orderId: order.id })} className="text-[10px] font-bold text-blue-600 hover:underline mt-1">Ver/Borrar pagos</button>
+                      <button onClick={() => setViewPaymentsModal({ isOpen: true, order })} className="text-[10px] font-bold text-blue-600 hover:underline mt-1">Ver pagos</button>
                     </div>
                   ) : (
                     <span className="text-orange-500 font-bold text-xs bg-orange-50 px-2 py-1 rounded">Por Cobrar</span>
                   )}
                   {balance > 0 && order.status !== 'Cancelado' && (
                     <button onClick={() => openPaymentModal(order)} className="mt-2 block text-xs bg-stone-900 text-white hover:bg-black px-3 py-1.5 rounded-lg font-bold transition-colors shadow-sm">
-                      + Añadir Pago
+                      + Cobrar
                     </button>
                   )}
                 </td>
@@ -1283,10 +880,6 @@ function AdminOrders({ orders, bcvRate, products }) {
                     <option value="Cancelado">Cancelado</option>
                   </select>
                   
-                  <button onClick={() => openEditModal(order)} className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors shadow-sm" title="Editar Pedido">
-                    <Edit className="w-5 h-5" />
-                  </button>
-
                   <button onClick={() => setReceiptModal({ isOpen: true, order })} className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors shadow-sm" title="Imprimir Nota">
                     <Printer className="w-5 h-5" />
                   </button>
@@ -1350,13 +943,21 @@ function AdminOrders({ orders, bcvRate, products }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
-                  {receiptModal.order.items.map((item, idx) => (
+                  {receiptModal.order.items.map((item: any, idx: number) => (
                     <tr key={idx}>
                       <td className="py-3 font-black text-gray-700">{item.quantity}</td>
                       <td className="py-3 text-gray-800 pr-2 font-medium">{item.isExtra ? '🎈 ' : ''}{item.name}</td>
                       <td className="text-right py-3 font-bold text-gray-800">${(Number(item.price) * item.quantity).toFixed(2)}</td>
                     </tr>
                   ))}
+                  {/* Fila para agregar el costo de delivery si existe */}
+                  {receiptModal.order.deliveryFee > 0 && (
+                    <tr className="border-t border-stone-100">
+                      <td className="py-3 font-black text-gray-700">1</td>
+                      <td className="py-3 text-gray-800 pr-2 font-medium">🚚 Delivery ({receiptModal.order.deliveryRouteName})</td>
+                      <td className="text-right py-3 font-bold text-gray-800">${Number(receiptModal.order.deliveryFee).toFixed(2)}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
 
@@ -1375,141 +976,76 @@ function AdminOrders({ orders, bcvRate, products }) {
         </div>
       )}
 
-      {/* --- MODAL DE PAGOS AVANZADO --- */}
-      {paymentModal.isOpen && orders.find((o) => o.id === paymentModal.orderId) && (() => {
-        const activeOrder = orders.find((o) => o.id === paymentModal.orderId);
-        
-        const orderTotalUSD = Number(activeOrder.totalUSD) || 0;
-        const previouslyPaidUSD = (activeOrder.payments || []).reduce((sum, p) => sum + (Number(p.amountUSD) || 0), 0);
-        const initialBalanceUSD = Math.max(0, orderTotalUSD - previouslyPaidUSD);
-        
-        const rateToUse = Number(paymentForm.customBcvRate) || bcvRate;
-        const inputAmountConvertedUSD = paymentForm.inputCurrency === 'BS' ? (Number(paymentForm.inputAmount) || 0) / rateToUse : (Number(paymentForm.inputAmount) || 0);
-
-        const newRemainingUSD = Math.max(0, initialBalanceUSD - inputAmountConvertedUSD);
-        const maxInputAllowed = paymentForm.inputCurrency === 'BS' ? (initialBalanceUSD * rateToUse).toFixed(2) : initialBalanceUSD.toFixed(2);
+      {paymentModal.isOpen && orders.find((o: any) => o.id === paymentModal.orderId) && (() => {
+        const activeOrder = orders.find((o: any) => o.id === paymentModal.orderId);
+        const orderTotal = Number(activeOrder.totalUSD) || 0;
+        const balance = orderTotal - (activeOrder.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amountUSD) || 0), 0);
 
         return (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 shrink-0">
-              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-600"/> Registrar Pago</h3>
-              <button onClick={() => setPaymentModal({ isOpen: false, orderId: null })} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full shadow-sm"><X className="w-5 h-5" /></button>
+              <h3 className="text-lg font-bold text-gray-800">Registrar Pago a Pedido</h3>
+              <button onClick={() => setPaymentModal({ isOpen: false, orderId: null })} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
             </div>
-            
             <div className="p-6 overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4 mb-6 bg-stone-100 p-4 rounded-2xl border border-stone-200">
+              <div className="mb-6 bg-stone-900 p-4 rounded-2xl flex justify-between items-center text-white shadow-lg">
                 <div>
-                  <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Deuda Actual</p>
-                  <p className="text-2xl font-black text-red-500">${initialBalanceUSD.toFixed(2)}</p>
-                  <p className="text-xs font-bold text-stone-400">Bs. {(initialBalanceUSD * rateToUse).toFixed(2)}</p>
+                  <p className="text-xs text-stone-400 font-bold uppercase tracking-wider">Deuda Pendiente</p>
+                  <p className="text-3xl font-black text-red-400">${balance.toFixed(2)}</p>
                 </div>
-                <div className="text-right border-l border-stone-300 pl-4">
-                  <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Quedaría en</p>
-                  <p className={`text-2xl font-black ${newRemainingUSD <= 0.01 ? 'text-green-500' : 'text-orange-500'}`}>${newRemainingUSD.toFixed(2)}</p>
-                  <p className="text-xs font-bold text-stone-400">Bs. {(newRemainingUSD * rateToUse).toFixed(2)}</p>
+                <div className="text-right">
+                  <p className="text-xs text-stone-400 font-bold uppercase tracking-wider">En Bs</p>
+                  <p className="text-xl font-bold text-stone-300">Bs. {(balance * bcvRate).toFixed(2)}</p>
                 </div>
               </div>
               
-              {initialBalanceUSD > 0 && (
+              {balance > 0 && (
               <form id="admin-payment-form" onSubmit={handleRegisterPayment} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Método</label>
-                  <select required value={paymentForm.method} 
-                    onChange={e => {
-                      const newMethod = e.target.value;
-                      const isBsMethod = ['Pago Móvil', 'Transferencia Bs'].includes(newMethod);
-                      setPaymentForm({...paymentForm, method: newMethod, inputCurrency: isBsMethod ? 'BS' : 'USD', inputAmount: ''});
-                    }} 
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50 font-medium">
-                    <option value="Pago Móvil">Pago Móvil (Bs)</option>
-                    <option value="Transferencia Bs">Transferencia Bs</option>
-                    <option value="Zelle">Zelle (USD)</option>
-                    <option value="Zinli">Zinli (USD)</option>
-                    <option value="Binance">Binance Pay (USDT)</option>
-                    <option value="Efectivo Divisas">Efectivo Divisas</option>
-                  </select>
-                </div>
-
-                <div className="bg-stone-50 border border-stone-200 p-3 rounded-2xl">
-                  <div className="flex bg-stone-200 p-1 rounded-xl mb-3">
-                    <button type="button" onClick={()=>setPaymentForm({...paymentForm, inputCurrency: 'USD', inputAmount: ''})} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${paymentForm.inputCurrency==='USD'?'bg-white shadow-sm text-green-700':'text-stone-500 hover:bg-stone-100'}`}>Ingresar en Divisas ($)</button>
-                    <button type="button" onClick={()=>setPaymentForm({...paymentForm, inputCurrency: 'BS', inputAmount: ''})} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${paymentForm.inputCurrency==='BS'?'bg-white shadow-sm text-blue-700':'text-stone-500 hover:bg-stone-100'}`}>Ingresar en Bolívares (Bs)</button>
-                  </div>
-
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Monto a Pagar ({paymentForm.inputCurrency === 'USD' ? '$ USD' : 'Bs VES'})</label>
-                    <input required type="number" step="0.01" max={maxInputAllowed} value={paymentForm.inputAmount} onChange={e => setPaymentForm({...paymentForm, inputAmount: e.target.value})} 
-                      className={`w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none text-sm font-black transition-colors ${paymentForm.inputCurrency === 'USD' ? 'bg-white focus:ring-2 focus:ring-green-500 text-green-700' : 'bg-white focus:ring-2 focus:ring-blue-500 text-blue-700'}`} 
-                      placeholder={`Max ${paymentForm.inputCurrency === 'USD' ? '$' : 'Bs. '}${maxInputAllowed}`} 
-                    />
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Método</label>
+                    <select required value={paymentForm.method} onChange={e => setPaymentForm({...paymentForm, method: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50 font-medium">
+                      <option value="Pago Móvil">Pago Móvil</option>
+                      <option value="Transferencia Bs">Transferencia Bs</option>
+                      <option value="Zelle">Zelle (USD)</option>
+                      <option value="Efectivo Divisas">Efectivo Divisas</option>
+                      <option value="Binance">Binance Pay</option>
+                    </select>
                   </div>
-                  
-                  {paymentForm.inputCurrency === 'BS' && (
-                    <div className="mt-3 pt-3 border-t border-stone-200">
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tasa BCV Aplicada</label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-stone-500">Bs.</span>
-                        <input type="number" step="0.01" value={paymentForm.customBcvRate} onChange={e => setPaymentForm({...paymentForm, customBcvRate: e.target.value})} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg outline-none text-xs bg-white text-stone-700 font-bold focus:border-blue-500" />
-                        <button type="button" onClick={()=>setPaymentForm({...paymentForm, customBcvRate: bcvRate})} className="text-[10px] bg-stone-200 hover:bg-stone-300 px-2 py-1.5 rounded-lg font-bold text-stone-600 shrink-0">Usar Tasa Actual</button>
-                      </div>
-                    </div>
-                  )}
-                  {paymentForm.inputAmount > 0 && (
-                    <div className="mt-3 text-center text-[11px] font-bold text-stone-500 bg-white py-1.5 rounded-lg border border-stone-100 shadow-sm">
-                      {paymentForm.inputCurrency === 'BS' ? `Al guardarse, se registrará como $${inputAmountConvertedUSD.toFixed(2)}` : `El cliente debería enviar Bs. ${(inputAmountConvertedUSD * rateToUse).toFixed(2)}`}
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Monto (USD)</label>
+                    <input required type="number" step="0.01" max={balance} value={paymentForm.amountUSD} onChange={e => setPaymentForm({...paymentForm, amountUSD: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50 font-bold" />
+                  </div>
                 </div>
 
-                {['Pago Móvil', 'Transferencia Bs'].includes(paymentForm.method) && (
-                  <div className="space-y-4 pt-2 border-t border-stone-100">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Banco Origen</label>
-                        <select required value={paymentForm.bank} onChange={e => setPaymentForm({...paymentForm, bank: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50">
-                          {VENEZUELAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Tlf Emisor</label>
-                        <input required type="tel" value={paymentForm.phone} onChange={e => setPaymentForm({...paymentForm, phone: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Nº de Referencia</label>
-                      <input required type="text" value={paymentForm.reference} onChange={e => setPaymentForm({...paymentForm, reference: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
-                    </div>
+                {paymentForm.method !== 'Efectivo Divisas' && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Nº de Referencia</label>
+                    <input required type="text" value={paymentForm.reference} onChange={e => setPaymentForm({...paymentForm, reference: e.target.value})} placeholder="Ej: 00123445" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
                   </div>
                 )}
-                {['Zelle', 'Zinli', 'Binance'].includes(paymentForm.method) && (
-                  <div className="space-y-4 pt-2 border-t border-stone-100">
+                {(paymentForm.method === 'Pago Móvil' || paymentForm.method === 'Transferencia Bs') && (
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Titular / Cuenta</label>
-                      <input required type="text" value={paymentForm.accountName} onChange={e => setPaymentForm({...paymentForm, accountName: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
+                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Banco</label>
+                      <select required value={paymentForm.bank} onChange={e => setPaymentForm({...paymentForm, bank: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50">
+                        {VENEZUELAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                      </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Referencia</label>
-                      <input required type="text" value={paymentForm.reference} onChange={e => setPaymentForm({...paymentForm, reference: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
-                    </div>
-                  </div>
-                )}
-                {paymentForm.method === 'Efectivo Divisas' && (
-                  <div className="space-y-4 pt-2 border-t border-stone-100">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Notas</label>
-                      <input type="text" value={paymentForm.notes} onChange={e => setPaymentForm({...paymentForm, notes: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm bg-stone-50" />
+                      <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Teléfono</label>
+                      <input required type="tel" value={paymentForm.phone} onChange={e => setPaymentForm({...paymentForm, phone: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50" />
                     </div>
                   </div>
                 )}
               </form>
               )}
             </div>
-            
-            {initialBalanceUSD > 0 && (
+            {balance > 0 && (
             <div className="p-5 border-t border-stone-100 bg-white shrink-0">
               <button form="admin-payment-form" type="submit" className="w-full bg-[#25D366] hover:bg-[#1ebd5a] text-white font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm">
-                Aprobar y Registrar Pago
+                Procesar Pago
               </button>
             </div>
             )}
@@ -1518,123 +1054,74 @@ function AdminOrders({ orders, bcvRate, products }) {
         );
       })()}
 
-      {/* --- MODAL PARA VER Y ELIMINAR PAGOS --- */}
-      {viewPaymentsModal.isOpen && (() => {
-        const activeOrderView = orders.find(o => o.id === viewPaymentsModal.orderId);
-        if (!activeOrderView) return null;
-
-        return (
+      {viewPaymentsModal.isOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50">
               <h3 className="text-lg font-bold text-gray-800">Historial de Pagos</h3>
-              <button onClick={() => setViewPaymentsModal({ isOpen: false, orderId: null })} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
+              <button onClick={() => setViewPaymentsModal({ isOpen: false, order: null })} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-5 overflow-y-auto max-h-[70vh]">
-              {activeOrderView.payments?.length > 0 ? (
-                <div className="space-y-3">
-                  {activeOrderView.payments.map((p, i) => (
-                    <div key={i} className="p-4 border border-green-200 rounded-2xl bg-green-50 shadow-sm relative overflow-hidden group">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="font-bold text-sm text-green-900 bg-green-200 px-2 py-0.5 rounded-lg">{p.method}</span>
-                        <div className="flex items-start gap-3 text-right">
-                          <div>
-                            <span className="font-black text-lg text-green-700 block leading-none">${Number(p.amountUSD).toFixed(2)}</span>
-                            <span className="text-[10px] font-bold text-green-600">Bs. {(Number(p.amountUSD) * bcvRate).toFixed(2)}</span>
-                          </div>
-                          <button onClick={() => handleDeletePayment(activeOrderView.id, i)} className="text-red-400 hover:text-red-600 bg-white hover:bg-red-50 p-1.5 rounded-lg transition-colors border border-red-100 shadow-sm"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                      {p.reference && <p className="text-xs text-stone-600 font-bold mt-1">Ref: {p.reference}</p>}
-                      {p.details && <p className="text-xs text-stone-500 mt-0.5">{p.details}</p>}
-                      <p className="text-[10px] text-stone-400 mt-2 font-medium uppercase tracking-wider">{p.date ? new Date(p.date).toLocaleString() : 'N/A'}</p>
+            <div className="p-5 overflow-y-auto">
+              <div className="space-y-3">
+                {viewPaymentsModal.order.payments?.map((p: any, i: number) => (
+                  <div key={i} className="p-4 border border-green-200 rounded-2xl bg-green-50 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-sm text-green-900 bg-green-200 px-2 py-0.5 rounded-lg">{p.method}</span>
+                      <span className="font-black text-lg text-green-700">${Number(p.amountUSD).toFixed(2)}</span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-stone-500 text-sm font-medium py-8">Este pedido no tiene pagos registrados.</p>
-              )}
+                    {p.reference && <p className="text-xs text-stone-600 font-bold mt-1">Ref: {p.reference}</p>}
+                    {p.details && <p className="text-xs text-stone-500 mt-0.5">{p.details}</p>}
+                    {/* AQUÍ ESTÁ EL ESCUDO DE RENDERIZADO PARA EL HISTORIAL DE PAGOS */}
+                    <p className="text-[10px] text-stone-400 mt-2 font-medium uppercase tracking-wider">{safeFormatDate(p.date, true)}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-        );
-      })()}
+      )}
       
-      {/* --- MODAL PARA CREAR / EDITAR PEDIDO --- */}
-      {isOrderModalOpen && (
+      {isManualOrderOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 shrink-0">
-              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                {editOrderId ? <><Edit className="w-5 h-5 text-blue-600"/> Editar Pedido</> : <><Plus className="w-5 h-5 text-red-600"/> Crear Pedido Manual</>}
-              </h3>
-              <button onClick={closeOrderModal} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
+              <h3 className="text-lg font-bold text-gray-800">Crear Pedido Manual</h3>
+              <button onClick={() => setIsManualOrderOpen(false)} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full"><X className="w-5 h-5" /></button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-grow bg-white">
-              <form id="manual-order-form" onSubmit={handleSaveOrder} className="space-y-6">
-                
-                {/* 1. Quien Envía */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-stone-700 uppercase tracking-wider"><User className="w-4 h-4"/> 1. Datos del Cliente (Quien Paga/Envía)</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input required type="text" placeholder="Nombre completo" value={manualOrder.senderName} onChange={e => setManualOrder({...manualOrder, senderName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50" />
-                    <input type="tel" placeholder="Teléfono" value={manualOrder.senderPhone} onChange={e => setManualOrder({...manualOrder, senderPhone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50" />
+            <div className="p-6 overflow-y-auto flex-grow">
+              <form id="manual-order-form" onSubmit={handleCreateManualOrder} className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Nombre del Cliente</label>
+                    <input required type="text" value={manualOrder.customerName} onChange={e => setManualOrder({...manualOrder, customerName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Teléfono</label>
+                    <input type="tel" value={manualOrder.phone} onChange={e => setManualOrder({...manualOrder, phone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-stone-50" />
                   </div>
                 </div>
 
-                {/* 2. Quien Recibe */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-stone-700 uppercase tracking-wider"><Heart className="w-4 h-4"/> 2. Datos de quien recibe</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input required type="text" placeholder="Nombre de quien recibe" value={manualOrder.recipientName} onChange={e => setManualOrder({...manualOrder, recipientName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50" />
-                    <input required type="tel" placeholder="Teléfono del destinatario" value={manualOrder.recipientPhone} onChange={e => setManualOrder({...manualOrder, recipientPhone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50" />
-                  </div>
-                </div>
-
-                {/* 3. Entrega */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-stone-700 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
-                  <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={manualOrder.deliveryAddress} onChange={e => setManualOrder({...manualOrder, deliveryAddress: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 resize-none" />
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">Fecha de Entrega</label>
-                      <input required type="date" value={manualOrder.deliveryDate} onChange={e => setManualOrder({...manualOrder, deliveryDate: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 text-stone-700" />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">Bloque Horario</label>
-                      <select required value={manualOrder.deliveryTimeSlot} onChange={e => setManualOrder({...manualOrder, deliveryTimeSlot: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 text-stone-700">
-                        <option value="Mañana (8:00 AM - 12:00 PM)">☀️ Mañana (8am - 12pm)</option>
-                        <option value="Tarde (1:00 PM - 5:00 PM)">🌤️ Tarde (1pm - 5pm)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <textarea placeholder="Dedicatoria (Opcional)" rows={2} value={manualOrder.dedication} onChange={e => setManualOrder({...manualOrder, dedication: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-blue-50/30 italic resize-none" />
-                </div>
-
-                {/* 4. Productos */}
-                <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200">
-                  <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"><ShoppingCart className="w-4 h-4"/> 4. Añadir / Editar Productos</h4>
-                  <div className="flex flex-col sm:flex-row gap-3 mb-2 items-end">
+                <div className="bg-stone-50 p-5 rounded-2xl border border-stone-200">
+                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2"><ShoppingCart className="w-4 h-4"/> Añadir Productos</h4>
+                  <div className="flex flex-col sm:flex-row gap-3 mb-4 items-end">
                     <div className="flex-1 w-full">
-                      <select value={manualProduct} onChange={e => setManualProduct(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white font-medium">
+                      <select value={manualProduct} onChange={e => setManualProduct(e.target.value)} className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white font-medium">
                         <option value="">Seleccionar del catálogo...</option>
-                        {products.map((p) => <option key={p.id} value={p.id}>{p.isExtra ? '🎈 Extra:' : ''} {p.name} - ${Number(p.price).toFixed(2)}</option>)}
+                        {products.map((p: any) => <option key={p.id} value={p.id}>{p.isExtra ? '🎈 Extra:' : ''} {p.name} - ${Number(p.price).toFixed(2)}</option>)}
                       </select>
                     </div>
                     <div className="w-full sm:w-24">
-                      <input type="number" min="1" value={manualQty} onChange={e => setManualQty(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-center font-bold" />
+                      <input type="number" min="1" value={manualQty} onChange={e => setManualQty(e.target.value)} className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm text-center font-bold" />
                     </div>
-                    <button type="button" onClick={handleAddManualItem} className="w-full sm:w-auto bg-stone-900 hover:bg-black text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md transition-colors">Añadir</button>
+                    <button type="button" onClick={handleAddManualItem} className="w-full sm:w-auto bg-stone-900 hover:bg-black text-white px-5 py-3 rounded-xl text-sm font-bold shadow-md transition-colors">Añadir</button>
                   </div>
                   
                   {manualOrder.items.length > 0 && (
-                    <div className="mt-4 border-t border-stone-200 pt-3 space-y-2">
+                    <div className="mt-4 border-t border-stone-200 pt-4 space-y-2">
                       {manualOrder.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white border border-stone-100 p-2.5 rounded-xl shadow-sm">
+                        <div key={idx} className="flex justify-between items-center bg-white border border-stone-100 p-3 rounded-xl shadow-sm">
                           <div className="font-medium text-sm text-gray-800"><span className="font-black bg-stone-100 px-2 py-0.5 rounded mr-2">{item.quantity}x</span> {item.name}</div>
                           <div className="flex items-center gap-4">
                             <span className="font-black text-gray-900">${(Number(item.price) * item.quantity).toFixed(2)}</span>
@@ -1644,12 +1131,21 @@ function AdminOrders({ orders, bcvRate, products }) {
                       ))}
                     </div>
                   )}
+
+                  {/* Campo para agregar Delivery a un pedido manual */}
+                  <div className="mt-4 pt-4 border-t border-stone-200">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Costo de Delivery (Opcional)</label>
+                    <div className="relative w-full sm:w-1/2">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 font-bold">$</span>
+                      <input type="number" step="0.01" min="0" value={manualDeliveryFee} onChange={e => setManualDeliveryFee(e.target.value)} className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-white font-bold" />
+                    </div>
+                  </div>
                 </div>
               </form>
             </div>
-            <div className="p-5 border-t border-stone-100 bg-white shrink-0">
-              <button form="manual-order-form" type="submit" className={`w-full text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg text-sm flex justify-center items-center gap-2 ${editOrderId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}>
-                {editOrderId ? <><Save className="w-5 h-5"/> Guardar Cambios</> : <><ArrowUpRight className="w-5 h-5"/> Generar Pedido</>}
+            <div className="p-6 border-t border-stone-100 bg-white shrink-0">
+              <button form="manual-order-form" type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg text-sm flex justify-center items-center gap-2">
+                Generar Pedido <ArrowUpRight className="w-5 h-5"/>
               </button>
             </div>
           </div>
@@ -1659,13 +1155,13 @@ function AdminOrders({ orders, bcvRate, products }) {
   );
 }
 
-function AdminProducts({ products, categories }) {
+function AdminProducts({ products, categories }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentProduct, setCurrentProduct] = useState({ id: '', name: '', price: '', image: '', description: '', categoryId: '', badge: '', isExtra: false, emoji: '' });
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const handleImageUpload = async (e) => {
+  const handleImageUpload = async (e: any) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -1692,7 +1188,7 @@ function AdminProducts({ products, categories }) {
     }
   };
 
-  const handleSaveProduct = async (e) => {
+  const handleSaveProduct = async (e: any) => {
     e.preventDefault();
     const productData = { 
       name: currentProduct.name,
@@ -1710,11 +1206,11 @@ function AdminProducts({ products, categories }) {
     setIsEditing(false);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if(window.confirm('¿Seguro que deseas eliminar este producto/extra?')) await deleteDoc(doc(db, 'products', id));
   };
 
-  const filteredProducts = products.filter((p) => String(p.name).toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredProducts = products.filter((p: any) => String(p.name).toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1764,7 +1260,7 @@ function AdminProducts({ products, categories }) {
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Categoría</label>
                   <select required value={currentProduct.categoryId} onChange={e => setCurrentProduct({...currentProduct, categoryId: e.target.value})} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50 focus:bg-white focus:border-red-500">
-                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1828,7 +1324,7 @@ function AdminProducts({ products, categories }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
-            {filteredProducts.map((product) => (
+            {filteredProducts.map((product: any) => (
               <tr key={product.id} className="hover:bg-stone-50/50 transition-colors">
                 <td className="p-4 flex items-center gap-4">
                   {product.isExtra ? (
@@ -1861,10 +1357,10 @@ function AdminProducts({ products, categories }) {
   );
 }
 
-function AdminCategories({ categories }) {
+function AdminCategories({ categories }: any) {
   const [newCategory, setNewCategory] = useState('');
 
-  const handleAdd = async (e) => {
+  const handleAdd = async (e: any) => {
     e.preventDefault();
     if(newCategory.trim()) {
       await addDoc(collection(db, 'categories'), { name: newCategory.trim() });
@@ -1872,7 +1368,7 @@ function AdminCategories({ categories }) {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if(window.confirm('¿Eliminar esta categoría?')) await deleteDoc(doc(db, 'categories', id));
   };
 
@@ -1890,7 +1386,7 @@ function AdminCategories({ categories }) {
         </form>
         
         <ul className="divide-y divide-stone-100 border border-stone-100 rounded-2xl overflow-hidden bg-stone-50/30">
-          {categories.map((cat) => (
+          {categories.map((cat: any) => (
             <li key={cat.id} className="py-4 px-5 flex justify-between items-center group hover:bg-white transition-colors">
               <span className="font-bold text-gray-700 flex items-center gap-3"><Tag className="w-4 h-4 text-stone-400" /> {cat.name}</span>
               <button onClick={() => handleDelete(cat.id)} className="text-stone-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><Trash2 className="w-5 h-5" /></button>
@@ -1903,14 +1399,66 @@ function AdminCategories({ categories }) {
   );
 }
 
+function AdminRoutes({ routes }: any) {
+  const [newRoute, setNewRoute] = useState({ name: '', price: '' });
+
+  const handleAdd = async (e: any) => {
+    e.preventDefault();
+    if(newRoute.name.trim() && newRoute.price !== '') {
+      await addDoc(collection(db, 'routes'), { name: newRoute.name.trim(), price: Number(newRoute.price) });
+      setNewRoute({ name: '', price: '' });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if(window.confirm('¿Eliminar esta ruta de envío?')) await deleteDoc(doc(db, 'routes', id));
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl animate-fade-in">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800">Zonas de Entrega (Delivery)</h2>
+        <p className="text-stone-500">Configura las áreas y los costos de envío para tus clientes.</p>
+      </div>
+      
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
+        <form onSubmit={handleAdd} className="flex gap-3 mb-6 items-end">
+          <div className="flex-1">
+            <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Nombre de la Zona</label>
+            <input required type="text" value={newRoute.name} onChange={e => setNewRoute({...newRoute, name: e.target.value})} placeholder="Ej: Zona Norte, San Francisco..." className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-red-500 bg-stone-50" />
+          </div>
+          <div className="w-32">
+            <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Costo (USD)</label>
+            <input required type="number" step="0.01" min="0" value={newRoute.price} onChange={e => setNewRoute({...newRoute, price: e.target.value})} placeholder="Ej: 3.00" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-red-500 bg-stone-50" />
+          </div>
+          <button type="submit" className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md h-[46px]">Agregar</button>
+        </form>
+        
+        <ul className="divide-y divide-stone-100 border border-stone-100 rounded-2xl overflow-hidden bg-stone-50/30">
+          {routes.map((route: any) => (
+            <li key={route.id} className="py-4 px-5 flex justify-between items-center group hover:bg-white transition-colors">
+              <span className="font-bold text-gray-700 flex items-center gap-3"><MapPin className="w-4 h-4 text-stone-400" /> {route.name}</span>
+              <div className="flex items-center gap-4">
+                <span className="font-black text-green-600">${Number(route.price).toFixed(2)}</span>
+                <button onClick={() => handleDelete(route.id)} className="text-stone-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><Trash2 className="w-5 h-5" /></button>
+              </div>
+            </li>
+          ))}
+          {routes.length === 0 && <li className="py-8 text-center text-stone-500">Sin zonas configuradas (El cliente no pagará delivery).</li>}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // --- CLIENT COMPONENTS (Storefront) ---
-function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, searchQuery }) {
+function ClientStorefront({ products, categories, routes, cart, setCart, user, bcvRate, searchQuery }: any) {
   const [checkoutStep, setCheckoutStep] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [showToast, setShowToast] = useState(false);
   
-  const [previewProduct, setPreviewProduct] = useState(null);
+  const [previewProduct, setPreviewProduct] = useState<any>(null);
   
   const [deliveryInfo, setDeliveryInfo] = useState({ 
     senderName: user?.name || '', 
@@ -1920,15 +1468,16 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     deliveryAddress: user?.address || '', 
     deliveryDate: '', 
     deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', 
-    dedication: '' 
+    dedication: '',
+    deliveryRouteId: '' 
   });
 
-  const [clientPayments, setClientPayments] = useState([]);
-  const [currentPayment, setCurrentPayment] = useState({ method: 'Zelle', reference: '', amountUSD: '', bank: VENEZUELAN_BANKS[0], phone: '' });
+  const [clientPayments, setClientPayments] = useState<any[]>([]);
+  const [currentPayment, setCurrentPayment] = useState({ method: 'Zelle', reference: '', amountUSD: '' as string | number, bank: VENEZUELAN_BANKS[0], phone: '' });
 
-  const addToCart = (product) => {
-    const existing = cart.find((item) => item.id === product.id);
-    if (existing) setCart(cart.map((item) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
+  const addToCart = (product: any) => {
+    const existing = cart.find((item: any) => item.id === product.id);
+    if (existing) setCart(cart.map((item: any) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
     else setCart([...cart, { ...product, quantity: 1 }]);
     
     setShowToast(true);
@@ -1936,7 +1485,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     setPreviewProduct(null);
   };
 
-  const handleQuickBuy = (product) => {
+  const handleQuickBuy = (product: any) => {
     addToCart(product);
     setTimeout(() => {
       setCheckoutStep(true);
@@ -1944,11 +1493,14 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     }, 100);
   }
 
-  const updateQuantity = (id, delta) => setCart(cart.map((item) => item.id === id ? { ...item, quantity: item.quantity + delta } : item).filter((item) => item.quantity > 0));
+  const updateQuantity = (id: string, delta: number) => setCart(cart.map((item: any) => item.id === id ? { ...item, quantity: item.quantity + delta } : item).filter((item: any) => item.quantity > 0));
   
-  const totalUSD = cart.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
-  const totalPaidUSD = clientPayments.reduce((sum, p) => sum + Number(p.amountUSD), 0);
-  const balanceUSD = totalUSD - totalPaidUSD;
+  const cartTotalUSD = cart.reduce((sum: number, item: any) => sum + (Number(item.price) * item.quantity), 0);
+  const deliveryFee = routes.find((r:any) => r.id === deliveryInfo.deliveryRouteId)?.price || 0;
+  const finalTotalUSD = cartTotalUSD + deliveryFee;
+  
+  const totalPaidUSD = clientPayments.reduce((sum: number, p: any) => sum + Number(p.amountUSD), 0);
+  const balanceUSD = finalTotalUSD - totalPaidUSD;
 
   const handleAddPayment = () => {
     const amount = Number(currentPayment.amountUSD);
@@ -1963,17 +1515,21 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     setCurrentPayment({ method: 'Zelle', reference: '', amountUSD: '', bank: VENEZUELAN_BANKS[0], phone: '' });
   };
 
-  const handleCheckout = async (e) => {
+  const handleCheckout = async (e: any) => {
     e.preventDefault();
     const phone = "584125296272";
     const orderDisplayId = `PED-${Math.floor(Math.random() * 10000)}`;
     
+    const selectedRoute = routes.find((r:any) => r.id === deliveryInfo.deliveryRouteId);
+
     await addDoc(collection(db, 'orders'), {
       displayId: orderDisplayId,
       ...deliveryInfo,
       items: cart,
-      totalUSD: totalUSD,
-      status: clientPayments.length > 0 ? (totalPaidUSD >= totalUSD ? 'Pagado' : 'Abonado') : 'Pendiente',
+      deliveryFee: deliveryFee,
+      deliveryRouteName: selectedRoute ? selectedRoute.name : 'N/A',
+      totalUSD: finalTotalUSD, 
+      status: clientPayments.length > 0 ? (totalPaidUSD >= finalTotalUSD ? 'Pagado' : 'Abonado') : 'Pendiente',
       payments: clientPayments.map(p => ({ ...p, date: new Date().toISOString() })),
       date: new Date().toISOString()
     });
@@ -1987,6 +1543,9 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     text += `▪️ Teléfono: ${deliveryInfo.recipientPhone}\n\n`;
     text += `*📍 DETALLES DE ENTREGA:*\n`;
     text += `▪️ Dirección: ${deliveryInfo.deliveryAddress}\n`;
+    if(selectedRoute) {
+      text += `▪️ Zona de Delivery: ${selectedRoute.name} ($${Number(selectedRoute.price).toFixed(2)})\n`;
+    }
     text += `▪️ Fecha: ${deliveryInfo.deliveryDate}\n`;
     text += `▪️ Horario: ${deliveryInfo.deliveryTimeSlot}\n\n`;
     
@@ -1995,11 +1554,15 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     }
     
     text += `*📦 PRODUCTOS:*\n`;
-    cart.forEach((item) => { 
+    cart.forEach((item: any) => { 
       text += `▪️ ${item.quantity}x ${item.isExtra && item.emoji ? item.emoji : ''} ${item.name} ($${Number(item.price).toFixed(2)})\n`; 
     });
     
-    text += `\n*💰 TOTAL:* $${totalUSD.toFixed(2)} (Bs. ${(totalUSD * bcvRate).toFixed(2)})\n`;
+    text += `\n*💰 SUBTOTAL:* $${cartTotalUSD.toFixed(2)}`;
+    if(deliveryFee > 0) {
+      text += `\n*🚚 COSTO DE ENVÍO:* $${deliveryFee.toFixed(2)}`;
+    }
+    text += `\n*💵 TOTAL A PAGAR:* $${finalTotalUSD.toFixed(2)} (Bs. ${(finalTotalUSD * bcvRate).toFixed(2)})\n`;
     
     text += `\n*💳 FORMAS DE PAGO:*\n`;
     if (clientPayments.length === 0) {
@@ -2016,10 +1579,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     setCart([]); setClientPayments([]); setCheckoutStep(false);
   };
 
-  const mainProducts = products.filter((p) => !p.isExtra);
-  const extraProducts = products.filter((p) => p.isExtra);
+  const mainProducts = products.filter((p: any) => !p.isExtra);
+  const extraProducts = products.filter((p: any) => p.isExtra);
 
-  const filteredProducts = mainProducts.filter((p) => {
+  const filteredProducts = mainProducts.filter((p: any) => {
     const matchCategory = selectedCategory === 'all' || p.categoryId === selectedCategory;
     const matchSearch = String(p.name).toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -2069,7 +1632,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
         <div className="flex flex-col gap-3 mb-6 w-full min-w-0">
           <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full min-w-0">
             <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shrink-0 ${selectedCategory === 'all' ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>Todos</button>
-            {categories.map((cat) => (
+            {categories.map((cat: any) => (
               <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ${selectedCategory === cat.id ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>{cat.name}</button>
             ))}
           </div>
@@ -2082,7 +1645,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
+          {filteredProducts.map((product: any) => (
             <div key={product.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl border border-stone-100 overflow-hidden flex flex-col group transition-all duration-300 relative">
               {product.badge && (
                 <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg border border-yellow-100">
@@ -2136,7 +1699,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                 <p className="font-medium text-center">Tu carrito está vacío.</p>
               </div>
             ) : (
-              cart.map((item) => (
+              cart.map((item: any) => (
                 <div key={item.id} className="flex gap-4 items-center mb-5 bg-white p-3 rounded-2xl shadow-sm border border-stone-100">
                   {item.isExtra ? (
                     <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center text-3xl shrink-0">{item.emoji || '✨'}</div>
@@ -2160,7 +1723,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
               <div className="mt-8">
                 <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Star className="w-3 h-3"/> Agrega un Extra</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {extraProducts.map((extra) => (
+                  {extraProducts.map((extra: any) => (
                     <button key={extra.id} onClick={() => addToCart(extra)} className="bg-white border border-stone-200 hover:border-pink-300 p-2 rounded-xl flex items-center gap-2 text-left transition-all hover:shadow-sm group">
                       <div className="bg-stone-50 w-8 h-8 rounded-lg flex items-center justify-center text-lg group-hover:scale-110 transition-transform shrink-0">{extra.emoji || '✨'}</div>
                       <div className="min-w-0">
@@ -2177,10 +1740,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
           {cart.length > 0 && (
             <div className="p-6 bg-white border-t border-stone-100">
               <div className="flex justify-between items-end mb-4">
-                <span className="text-stone-500 font-medium">Total</span>
+                <span className="text-stone-500 font-medium">Total de Arreglos</span>
                 <div className="text-right">
-                  <div className="text-2xl font-black text-gray-900">${totalUSD.toFixed(2)}</div>
-                  <div className="text-xs font-bold text-stone-400">Bs. {(totalUSD * bcvRate).toFixed(2)}</div>
+                  <div className="text-2xl font-black text-gray-900">${cartTotalUSD.toFixed(2)}</div>
+                  <div className="text-xs font-bold text-stone-400">Bs. {(cartTotalUSD * bcvRate).toFixed(2)}</div>
                 </div>
               </div>
               <button onClick={() => setCheckoutStep(true)} className="w-full bg-[#25D366] hover:bg-[#1ebd5a] text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2">
@@ -2206,7 +1769,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
             </div>
             
             <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
-              <div className="mb-2 text-xs font-bold text-red-500 uppercase tracking-widest">{categories.find((c)=>c.id === previewProduct.categoryId)?.name || 'Arreglo Especial'}</div>
+              <div className="mb-2 text-xs font-bold text-red-500 uppercase tracking-widest">{categories.find((c:any)=>c.id === previewProduct.categoryId)?.name || 'Arreglo Especial'}</div>
               <h2 className="text-3xl font-black text-gray-900 mb-4 leading-tight">{previewProduct.name}</h2>
               <p className="text-stone-500 text-base mb-8 leading-relaxed whitespace-pre-wrap">{previewProduct.description}</p>
               
@@ -2258,6 +1821,19 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
 
                 <div className="space-y-4">
                   <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
+                  
+                  {routes.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Zona de Entrega (Delivery)</label>
+                      <select required value={deliveryInfo.deliveryRouteId} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryRouteId:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 text-stone-700 bg-white shadow-sm font-bold">
+                        <option value="">Selecciona tu zona...</option>
+                        {routes.map((r: any) => (
+                          <option key={r.id} value={r.id}>{r.name} - ${Number(r.price).toFixed(2)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={deliveryInfo.deliveryAddress} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryAddress:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 resize-none"/>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2278,7 +1854,14 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                 </div>
 
                 <div className="bg-stone-50 p-5 rounded-2xl border border-stone-100">
-                  <h4 className="text-sm font-bold mb-4 flex items-center gap-2 text-blue-600 uppercase tracking-wider"><CreditCard className="w-4 h-4"/> 4. Forma de Pago</h4>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-sm font-bold flex items-center gap-2 text-blue-600 uppercase tracking-wider"><CreditCard className="w-4 h-4"/> 4. Forma de Pago</h4>
+                    <div className="text-right">
+                       <span className="text-xs text-stone-500 font-bold">Total a Pagar:</span>
+                       <span className="ml-2 font-black text-lg text-gray-900">${finalTotalUSD.toFixed(2)}</span>
+                    </div>
+                  </div>
+
                   {balanceUSD > 0 && (
                     <div className="space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2289,10 +1872,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                           <option value="Zinli">Zinli</option>
                           <option value="Binance">Binance Pay</option>
                         </select>
-                        <input type="number" step="0.01" max={balanceUSD} placeholder={`Monto USD (Deuda: $${balanceUSD.toFixed(2)})`} value={currentPayment.amountUSD} onChange={e=>setCurrentPayment({...currentPayment, amountUSD:e.target.value})} className="w-full px-3 py-3 border border-stone-200 rounded-xl text-sm outline-none"/>
+                        <input type="number" step="0.01" max={balanceUSD} placeholder={`Monto USD (Deuda: $${balanceUSD.toFixed(2)})`} value={currentPayment.amountUSD} onChange={e=>setCurrentPayment({...currentPayment, amountUSD:e.target.value})} className="w-full px-3 py-3 border border-stone-200 rounded-xl text-sm outline-none font-bold"/>
                       </div>
                       {currentPayment.method === 'Pago Móvil' && currentPayment.amountUSD && <p className="text-[11px] text-blue-600 font-bold bg-blue-50 p-2 rounded-lg">Monto en Bolívares: Bs. {(Number(currentPayment.amountUSD) * bcvRate).toFixed(2)}</p>}
-                      <button type="button" onClick={handleAddPayment} className="w-full bg-stone-800 hover:bg-black text-white text-sm py-3 rounded-xl font-bold transition-all shadow-md">Registrar este pago</button>
+                      <button type="button" onClick={handleAddPayment} className="w-full bg-stone-800 hover:bg-black text-white text-sm py-3 rounded-xl font-bold transition-all shadow-md">Añadir soporte de pago</button>
                     </div>
                   )}
                   {clientPayments.length > 0 && (
