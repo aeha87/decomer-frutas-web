@@ -6,7 +6,7 @@ import {
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook,
   CheckCircle, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, 
   Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock,
-  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save, ShieldAlert
+  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save, ShieldAlert, Megaphone
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -46,6 +46,14 @@ const getSafeTime = (dateVal) => {
   return 0;
 };
 
+// Formateador de teléfonos para WhatsApp (🇻🇪)
+const formatPhoneForWA = (phone) => {
+  if(!phone) return '';
+  let clean = String(phone).replace(/\D/g, '');
+  if (clean.startsWith('0')) clean = '58' + clean.substring(1);
+  return clean;
+};
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -53,6 +61,8 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [promotions, setPromotions] = useState([]);
   const [systemUsers, setSystemUsers] = useState([]); 
   const [bcvRate, setBcvRate] = useState(36.50);
   const [cart, setCart] = useState([]);
@@ -115,6 +125,8 @@ export default function App() {
 
     let unsubOrders = () => {};
     let unsubUsers = () => {};
+    let unsubClients = () => {};
+    let unsubPromos = () => {};
     
     if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
@@ -129,6 +141,14 @@ export default function App() {
       unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
         setSystemUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
+
+      unsubClients = onSnapshot(collection(db, 'clients'), (snap) => {
+        setClients(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
+      unsubPromos = onSnapshot(collection(db, 'promotions'), (snap) => {
+        setPromotions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
     }
 
     return () => {
@@ -136,6 +156,8 @@ export default function App() {
       unsubCategories();
       unsubOrders();
       unsubUsers();
+      unsubClients();
+      unsubPromos();
     };
   }, [currentUser]);
 
@@ -178,7 +200,7 @@ export default function App() {
       />
       <main className="flex-grow container mx-auto px-4 py-8 relative">
         {currentUser?.role === 'admin' ? (
-          <AdminDashboard products={products} categories={categories} orders={orders} systemUsers={systemUsers} bcvRate={bcvRate} />
+          <AdminDashboard products={products} categories={categories} orders={orders} systemUsers={systemUsers} bcvRate={bcvRate} clients={clients} promotions={promotions} />
         ) : (
           <ClientStorefront 
             products={products} 
@@ -385,7 +407,7 @@ function Footer() {
 }
 
 // --- ADMIN COMPONENTS ---
-function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) {
+function AdminDashboard({ products, categories, orders, systemUsers, bcvRate, clients, promotions }) {
   const [activeTab, setActiveTab] = useState('orders');
 
   return (
@@ -410,6 +432,11 @@ function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) 
             <button onClick={() => setActiveTab('delivery')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> Rutas de Entrega</button>
             
             <div className="pt-4 mt-4 border-t border-stone-100"></div>
+
+            <button onClick={() => setActiveTab('clients')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'clients' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
+            <button onClick={() => setActiveTab('promos')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'promos' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Zap className="w-5 h-5" /> Promociones</button>
+
+            <div className="pt-4 mt-4 border-t border-stone-100"></div>
             
             <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
             <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
@@ -421,6 +448,8 @@ function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) 
         {activeTab === 'kpis' && <AdminKPIs orders={orders} bcvRate={bcvRate} />}
         {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
         {activeTab === 'delivery' && <AdminDeliveryRoute orders={orders} bcvRate={bcvRate} />}
+        {activeTab === 'clients' && <AdminClients clients={clients} promotions={promotions} products={products} />}
+        {activeTab === 'promos' && <AdminPromos promotions={promotions} products={products} />}
         {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
         {activeTab === 'categories' && <AdminCategories categories={categories} />}
       </div>
@@ -428,7 +457,362 @@ function AdminDashboard({ products, categories, orders, systemUsers, bcvRate }) 
   );
 }
 
-// --- MÓDULO REDISEÑADO: RUTAS DE ENTREGA DINÁMICO ---
+// --- MÓDULO MIS CLIENTES ---
+function AdminClients({ clients, promotions, products }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClients, setSelectedClients] = useState([]);
+  
+  // Modals
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [selectedPromoId, setSelectedPromoId] = useState('');
+  
+  // Cola de envío masivo
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const filteredClients = clients.filter(c => 
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (c.phone || '').includes(searchTerm)
+  );
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedClients(filteredClients.map(c => c.id));
+    } else {
+      setSelectedClients([]);
+    }
+  };
+
+  const toggleSelectClient = (id) => {
+    if (selectedClients.includes(id)) {
+      setSelectedClients(selectedClients.filter(cId => cId !== id));
+    } else {
+      setSelectedClients([...selectedClients, id]);
+    }
+  };
+
+  const getPromoText = (promoId) => {
+    const promo = promotions.find(p => p.id === promoId);
+    if (!promo) return '';
+    
+    let text = `*${promo.title}*\n\n${promo.message}\n\n`;
+    
+    if (promo.selectedProductIds && promo.selectedProductIds.length > 0) {
+      text += `*🔥 Promociones Destacadas:*\n`;
+      promo.selectedProductIds.forEach(pid => {
+         const product = products.find(prod => prod.id === pid);
+         if (product) {
+           text += `▪️ ${product.isExtra ? product.emoji : '🍓'} ${product.name} - *$${Number(product.price).toFixed(2)}*\n`;
+         }
+      });
+      text += `\nHaz tu pedido aquí:\n`;
+      text += `🌐 https://decomer-frutas.web.app\n`;
+    }
+    
+    return encodeURIComponent(text);
+  };
+
+  const handleStartQueue = () => {
+    if (!selectedPromoId) return alert("Selecciona una promoción primero.");
+    if (selectedClients.length === 0) return alert("Selecciona al menos un cliente.");
+    setIsPromoModalOpen(false);
+    setCurrentIndex(0);
+    setIsQueueOpen(true);
+  };
+
+  const handleSendCurrent = () => {
+    const currentClient = clients.find(c => c.id === selectedClients[currentIndex]);
+    if (!currentClient) return;
+    
+    const text = getPromoText(selectedPromoId);
+    const phone = formatPhoneForWA(currentClient.phone);
+    
+    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+  };
+
+  const handleNextInQueue = () => {
+    if (currentIndex < selectedClients.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      setIsQueueOpen(false);
+      setSelectedClients([]);
+      alert("¡Envío masivo finalizado!");
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Mis Clientes</h2>
+          <p className="text-stone-500">Cartera de clientes y envíos de marketing</p>
+        </div>
+        
+        {selectedClients.length > 0 && (
+          <button onClick={() => setIsPromoModalOpen(true)} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg text-sm animate-fade-in">
+            <Send className="w-4 h-4" /> Enviar Promo a {selectedClients.length} clientes
+          </button>
+        )}
+      </div>
+
+      <div className="relative w-full md:w-96">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+        <input 
+          type="text" 
+          placeholder="Buscar cliente por nombre o teléfono..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 bg-white border border-stone-200 rounded-2xl outline-none focus:border-blue-500 text-sm shadow-sm transition-colors"
+        />
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
+                <th className="p-4 text-center w-12">
+                  <input type="checkbox" onChange={handleSelectAll} checked={selectedClients.length === filteredClients.length && filteredClients.length > 0} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                </th>
+                <th className="p-4 font-bold">Cliente</th>
+                <th className="p-4 font-bold">Teléfono</th>
+                <th className="p-4 font-bold text-center">Nº Pedidos</th>
+                <th className="p-4 font-bold text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {filteredClients.map((client) => (
+                <tr key={client.id} className="hover:bg-stone-50/50 transition-colors">
+                  <td className="p-4 text-center">
+                    <input type="checkbox" checked={selectedClients.includes(client.id)} onChange={() => toggleSelectClient(client.id)} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  </td>
+                  <td className="p-4">
+                    <span className="font-bold text-gray-900 block">{client.name || 'Sin Nombre'}</span>
+                    <span className="text-xs text-stone-500 truncate max-w-[200px] block" title={client.address}>{client.address || 'Sin dirección guardada'}</span>
+                  </td>
+                  <td className="p-4 font-medium text-stone-700">{client.phone}</td>
+                  <td className="p-4 text-center">
+                    <span className="bg-blue-50 text-blue-700 font-black px-3 py-1 rounded-full text-xs">{client.totalOrders || 1}</span>
+                  </td>
+                  <td className="p-4 flex justify-center gap-2">
+                    <a href={`https://wa.me/${formatPhoneForWA(client.phone)}`} target="_blank" rel="noopener noreferrer" className="text-[#25D366] bg-[#25D366]/10 hover:bg-[#25D366]/20 p-2.5 rounded-xl transition-colors" title="Chat Directo">
+                      <MessageCircle className="w-5 h-5" />
+                    </a>
+                  </td>
+                </tr>
+              ))}
+              {filteredClients.length === 0 && (
+                <tr><td colSpan="5" className="p-12 text-center text-stone-500 font-medium">No se encontraron clientes registrados.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL SELECCIONAR PROMO */}
+      {isPromoModalOpen && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 shrink-0">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Megaphone className="w-5 h-5 text-green-600"/> Enviar Promoción</h3>
+              <button onClick={() => setIsPromoModalOpen(false)} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full shadow-sm"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-sm text-stone-600 mb-4">Se enviará un mensaje a los <strong>{selectedClients.length}</strong> clientes seleccionados.</p>
+              
+              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">Selecciona la Promoción</label>
+              {promotions.length > 0 ? (
+                <select value={selectedPromoId} onChange={e => setSelectedPromoId(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50 focus:bg-white focus:border-green-500 mb-6">
+                  <option value="">Seleccione una promoción...</option>
+                  {promotions.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                </select>
+              ) : (
+                <div className="bg-orange-50 text-orange-700 p-4 rounded-xl text-sm font-medium border border-orange-100 mb-6">
+                  No has creado ninguna promoción aún. Ve a la pestaña "Promociones" para crear una.
+                </div>
+              )}
+              
+              <button onClick={handleStartQueue} disabled={!selectedPromoId} className="w-full bg-[#25D366] hover:bg-[#1ebd5a] disabled:bg-stone-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm">
+                Iniciar Envío Masivo
+              </button>
+              <p className="text-[10px] text-stone-400 text-center mt-3">Para evitar bloqueos de WhatsApp, los enviaremos uno por uno.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* COLA DE ENVÍO MASIVO */}
+      {isQueueOpen && (() => {
+        const currentClient = clients.find(c => c.id === selectedClients[currentIndex]);
+        return (
+        <div className="fixed inset-0 bg-stone-900/90 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col items-center p-8 text-center relative border-4 border-[#25D366]">
+            <button onClick={() => {if(window.confirm('¿Detener el envío masivo?')) setIsQueueOpen(false)}} className="absolute top-4 right-4 text-stone-400 hover:text-red-500"><X className="w-6 h-6"/></button>
+            
+            <div className="w-16 h-16 bg-[#25D366]/20 rounded-full flex items-center justify-center mb-4">
+              <Send className="w-8 h-8 text-[#25D366] ml-1" />
+            </div>
+            
+            <h3 className="font-black text-2xl text-gray-800 mb-1">Enviando Promoción</h3>
+            <p className="text-stone-500 font-bold mb-6 bg-stone-100 px-4 py-1.5 rounded-full text-sm">
+              Cliente {currentIndex + 1} de {selectedClients.length}
+            </p>
+
+            <div className="bg-stone-50 border border-stone-200 w-full p-4 rounded-2xl mb-6 text-left shadow-inner">
+              <p className="text-xs font-bold text-stone-400 uppercase mb-1">Preparando mensaje para:</p>
+              <p className="font-bold text-lg text-gray-800">{currentClient?.name || 'Cliente'}</p>
+              <p className="text-sm text-stone-500">{currentClient?.phone}</p>
+            </div>
+
+            <button onClick={handleSendCurrent} className="w-full bg-[#25D366] hover:bg-[#1ebd5a] text-white font-bold py-4 rounded-2xl transition-all shadow-xl shadow-green-200 flex items-center justify-center gap-2 text-lg mb-4 hover:scale-[1.02]">
+              1. Enviar a este cliente
+            </button>
+
+            <button onClick={handleNextInQueue} className="w-full bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-3.5 rounded-xl transition-all border border-stone-200">
+              2. Siguiente Cliente ➡️
+            </button>
+            
+            <p className="text-xs text-stone-400 mt-6">
+              <strong>Instrucciones:</strong> Haz clic en "Enviar" (se abrirá WhatsApp). Cuando lo envíes, vuelve a esta pestaña y haz clic en "Siguiente".
+            </p>
+          </div>
+        </div>
+        );
+      })()}
+
+    </div>
+  );
+}
+
+// --- MÓDULO PROMOCIONES ---
+function AdminPromos({ promotions, products }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentPromo, setCurrentPromo] = useState({ id: '', title: '', message: '', selectedProductIds: [] });
+
+  const handleToggleProduct = (productId) => {
+    let newIds = [...currentPromo.selectedProductIds];
+    if (newIds.includes(productId)) {
+      newIds = newIds.filter(id => id !== productId);
+    } else {
+      newIds.push(productId);
+    }
+    setCurrentPromo({ ...currentPromo, selectedProductIds: newIds });
+  };
+
+  const handleSavePromo = async (e) => {
+    e.preventDefault();
+    if (!currentPromo.title || !currentPromo.message) return alert("El título y el mensaje son obligatorios.");
+
+    const promoData = {
+      title: currentPromo.title,
+      message: currentPromo.message,
+      selectedProductIds: currentPromo.selectedProductIds,
+      dateCreated: new Date().toISOString()
+    };
+
+    if (currentPromo.id) {
+      await updateDoc(doc(db, 'promotions', currentPromo.id), promoData);
+    } else {
+      await addDoc(collection(db, 'promotions'), promoData);
+    }
+    setIsEditing(false);
+  };
+
+  const handleDelete = async (id) => {
+    if(window.confirm('¿Seguro que deseas eliminar esta promoción?')) {
+      await deleteDoc(doc(db, 'promotions', id));
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Zap className="w-6 h-6 text-yellow-500"/> Promociones</h2>
+          <p className="text-stone-500">Crea mensajes atractivos para enviar a tus clientes</p>
+        </div>
+        <button onClick={() => { setCurrentPromo({ id: '', title: '', message: '', selectedProductIds: [] }); setIsEditing(true); }}
+          className="bg-stone-900 hover:bg-black text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg text-sm"
+        >
+          <Plus className="w-5 h-5" /> Nueva Promo
+        </button>
+      </div>
+
+      {isEditing && (
+        <div className="bg-white p-6 rounded-3xl shadow-xl border border-stone-200 relative animate-scale-in">
+          <button onClick={()=>setIsEditing(false)} className="absolute top-4 right-4 text-stone-400 hover:text-stone-800"><X className="w-6 h-6"/></button>
+          <h3 className="font-bold text-lg mb-6 text-gray-800">Redactar Promoción</h3>
+          
+          <form onSubmit={handleSavePromo} className="space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Título de la Promo (Interno y Cabecera)</label>
+              <input required type="text" placeholder="Ej: 🎈 Especial Día de las Madres" value={currentPromo.title} onChange={e => setCurrentPromo({...currentPromo, title: e.target.value})} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50 focus:bg-white focus:border-stone-500 font-bold" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Cuerpo del Mensaje</label>
+              <textarea required placeholder="Hola! Tenemos una súper sorpresa preparada para ti hoy..." value={currentPromo.message} onChange={e => setCurrentPromo({...currentPromo, message: e.target.value})} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50 focus:bg-white focus:border-stone-500 min-h-[120px]" />
+            </div>
+
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200">
+              <label className="block text-xs font-bold text-gray-700 mb-3 uppercase flex items-center gap-2"><Tag className="w-4 h-4"/> Adjuntar Productos (Opcional)</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-1">
+                {products.map(p => (
+                  <label key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${currentPromo.selectedProductIds.includes(p.id) ? 'bg-white border-green-500 shadow-sm' : 'bg-white border-stone-200 opacity-70 hover:opacity-100'}`}>
+                    <input type="checkbox" checked={currentPromo.selectedProductIds.includes(p.id)} onChange={() => handleToggleProduct(p.id)} className="w-4 h-4 text-green-600 rounded" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-gray-800 truncate">{p.name}</p>
+                      <p className="text-[10px] text-stone-500 font-black">${Number(p.price).toFixed(2)}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <button type="submit" className="px-8 py-3 text-sm font-bold bg-stone-900 hover:bg-black text-white rounded-xl shadow-lg transition-all flex items-center gap-2"><Save className="w-4 h-4"/> Guardar Promoción</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {promotions.map((promo) => (
+          <div key={promo.id} className="bg-white rounded-3xl shadow-sm border border-stone-200 p-5 flex flex-col hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400"></div>
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="font-black text-gray-800 text-lg leading-tight">{promo.title}</h3>
+              <div className="flex gap-1 shrink-0 bg-stone-50 rounded-lg p-1 border border-stone-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => {setCurrentPromo(promo); setIsEditing(true); window.scrollTo({top:0, behavior:'smooth'});}} className="text-blue-500 hover:bg-blue-50 p-1.5 rounded-md"><Edit className="w-4 h-4" /></button>
+                <button onClick={() => handleDelete(promo.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-md"><Trash2 className="w-4 h-4" /></button>
+              </div>
+            </div>
+            
+            <p className="text-sm text-stone-500 line-clamp-3 mb-4 italic leading-relaxed whitespace-pre-wrap flex-grow bg-stone-50 p-3 rounded-xl border border-stone-100">"{promo.message}"</p>
+            
+            <div className="flex justify-between items-end mt-auto pt-4 border-t border-stone-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 bg-stone-100 px-2 py-1 rounded-md">
+                {promo.selectedProductIds?.length || 0} productos adjuntos
+              </span>
+            </div>
+          </div>
+        ))}
+        
+        {promotions.length === 0 && !isEditing && (
+          <div className="col-span-full bg-stone-50 border-2 border-dashed border-stone-200 rounded-3xl p-12 text-center text-stone-500">
+            <Megaphone className="w-12 h-12 mx-auto mb-4 opacity-20" />
+            <p className="font-bold text-lg mb-1">Crea tu primera promoción</p>
+            <p className="text-sm">Envía descuentos y catálogos a tus clientes guardados.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ... EL RESTO DEL CÓDIGO (AdminDeliveryRoute, AdminKPIs, AdminOrders, AdminProducts, AdminCategories) SE MANTIENE INTACTO ...
+
 function AdminDeliveryRoute({ orders, bcvRate }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedShift, setSelectedShift] = useState('Todos');
@@ -976,6 +1360,28 @@ function AdminOrders({ orders, bcvRate, products }) {
         payments: [],
         date: new Date().toISOString()
       });
+    }
+
+    // --- GUARDAR CLIENTE AUTOMÁTICAMENTE ---
+    const cleanPhone = String(manualOrder.senderPhone).replace(/\D/g, '');
+    if (cleanPhone) {
+      const clientRef = doc(db, 'clients', cleanPhone);
+      const clientSnap = await getDoc(clientRef);
+      if (clientSnap.exists()) {
+        await updateDoc(clientRef, { 
+          totalOrders: (clientSnap.data().totalOrders || 0) + (editOrderId ? 0 : 1), 
+          name: manualOrder.senderName || clientSnap.data().name, 
+          address: manualOrder.deliveryAddress || clientSnap.data().address 
+        });
+      } else {
+        await setDoc(clientRef, { 
+          name: manualOrder.senderName || 'Sin Nombre', 
+          phone: manualOrder.senderPhone, 
+          address: manualOrder.deliveryAddress || '', 
+          totalOrders: 1, 
+          dateAdded: new Date().toISOString() 
+        });
+      }
     }
     
     closeOrderModal();
@@ -1804,6 +2210,28 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
       payments: clientPayments.map(p => ({ ...p, date: new Date().toISOString() })),
       date: new Date().toISOString()
     });
+
+    // --- GUARDAR CLIENTE AUTOMÁTICAMENTE ---
+    const cleanPhone = String(deliveryInfo.senderPhone).replace(/\D/g, '');
+    if (cleanPhone) {
+      const clientRef = doc(db, 'clients', cleanPhone);
+      const clientSnap = await getDoc(clientRef);
+      if (clientSnap.exists()) {
+        await updateDoc(clientRef, { 
+          totalOrders: (clientSnap.data().totalOrders || 0) + 1, 
+          name: deliveryInfo.senderName || clientSnap.data().name, 
+          address: deliveryInfo.deliveryAddress || clientSnap.data().address 
+        });
+      } else {
+        await setDoc(clientRef, { 
+          name: deliveryInfo.senderName || 'Sin Nombre', 
+          phone: deliveryInfo.senderPhone, 
+          address: deliveryInfo.deliveryAddress || '', 
+          totalOrders: 1, 
+          dateAdded: new Date().toISOString() 
+        });
+      }
+    }
 
     let text = `*¡Hola Decomer Frutas! Nuevo Pedido Web* 🍓🍫\n\n*Orden:* #${orderDisplayId}\n\n`;
     text += `*📤 QUIEN ENVÍA:*\n`;
