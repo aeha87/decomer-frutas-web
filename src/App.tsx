@@ -70,6 +70,7 @@ export default function App() {
   
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [routes, setRoutes] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [bcvRate, setBcvRate] = useState(36.50);
   const [cart, setCart] = useState<any[]>([]);
@@ -130,6 +131,10 @@ export default function App() {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    const unsubRoutes = onSnapshot(collection(db, 'routes'), (snap) => {
+      setRoutes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     let unsubOrders = () => {};
     if (currentUser?.role === 'admin') {
       unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
@@ -146,6 +151,7 @@ export default function App() {
     return () => {
       unsubProducts();
       unsubCategories();
+      unsubRoutes();
       unsubOrders();
     };
   }, [currentUser]);
@@ -189,11 +195,12 @@ export default function App() {
       />
       <main className="flex-grow container mx-auto px-4 py-8 relative">
         {currentUser?.role === 'admin' ? (
-          <AdminDashboard products={products} categories={categories} orders={orders} bcvRate={bcvRate} />
+          <AdminDashboard products={products} categories={categories} routes={routes} orders={orders} bcvRate={bcvRate} />
         ) : (
           <ClientStorefront 
             products={products} 
             categories={categories} 
+            routes={routes}
             cart={cart} 
             setCart={setCart} 
             user={currentUser} 
@@ -395,7 +402,7 @@ function Footer() {
 }
 
 // --- ADMIN COMPONENTS ---
-function AdminDashboard({ products, categories, orders, bcvRate }: any) {
+function AdminDashboard({ products, categories, routes, orders, bcvRate }: any) {
   const [activeTab, setActiveTab] = useState('orders');
 
   return (
@@ -422,16 +429,18 @@ function AdminDashboard({ products, categories, orders, bcvRate }: any) {
             
             <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
             <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
+            <button onClick={() => setActiveTab('routes')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'routes' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><MapPin className="w-5 h-5" /> Rutas / Envíos</button>
           </nav>
         </div>
       </div>
 
       <div className="flex-1 min-w-0">
         {activeTab === 'kpis' && <AdminKPIs orders={orders} bcvRate={bcvRate} />}
-        {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
+        {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} routes={routes} />}
         {activeTab === 'customers' && <AdminCustomers orders={orders} />}
         {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
         {activeTab === 'categories' && <AdminCategories categories={categories} />}
+        {activeTab === 'routes' && <AdminRoutes routes={routes} />}
       </div>
     </div>
   );
@@ -653,7 +662,7 @@ function AdminCustomers({ orders }: any) {
   );
 }
 
-function AdminOrders({ orders, bcvRate, products }: any) {
+function AdminOrders({ orders, bcvRate, products, routes }: any) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
 
@@ -666,6 +675,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
   const [manualOrder, setManualOrder] = useState({ customerName: '', phone: '', address: '', notes: '', items: [] as any[] });
   const [manualProduct, setManualProduct] = useState('');
   const [manualQty, setManualQty] = useState<string | number>(1);
+  const [manualDeliveryFee, setManualDeliveryFee] = useState<string | number>(0);
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     await updateDoc(doc(db, 'orders', id), { status: newStatus });
@@ -735,11 +745,15 @@ function AdminOrders({ orders, bcvRate, products }: any) {
   const handleCreateManualOrder = async (e: any) => {
     e.preventDefault();
     if (manualOrder.items.length === 0) return alert("Debes agregar al menos un producto.");
-    const totalUSD = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
+    const productsTotal = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
+    const totalUSD = productsTotal + Number(manualDeliveryFee);
+
     await addDoc(collection(db, 'orders'), {
       displayId: `PED-M${Math.floor(Math.random() * 10000)}`,
       customerName: manualOrder.customerName,
       items: manualOrder.items,
+      deliveryFee: Number(manualDeliveryFee),
+      deliveryRouteName: Number(manualDeliveryFee) > 0 ? 'Delivery (Manual)' : 'N/A',
       totalUSD: totalUSD,
       status: 'Pendiente',
       payments: [],
@@ -750,6 +764,7 @@ function AdminOrders({ orders, bcvRate, products }: any) {
     });
     setIsManualOrderOpen(false);
     setManualOrder({ customerName: '', phone: '', address: '', notes: '', items: [] });
+    setManualDeliveryFee(0);
   };
 
   const getStatusColor = (status: string) => {
@@ -944,6 +959,14 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                       <td className="text-right py-3 font-bold text-gray-800">${(Number(item.price) * item.quantity).toFixed(2)}</td>
                     </tr>
                   ))}
+                  {/* Fila para agregar el costo de delivery si existe */}
+                  {receiptModal.order.deliveryFee > 0 && (
+                    <tr className="border-t border-stone-100">
+                      <td className="py-3 font-black text-gray-700">1</td>
+                      <td className="py-3 text-gray-800 pr-2 font-medium">🚚 Delivery ({receiptModal.order.deliveryRouteName})</td>
+                      <td className="text-right py-3 font-bold text-gray-800">${Number(receiptModal.order.deliveryFee).toFixed(2)}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
 
@@ -1117,6 +1140,15 @@ function AdminOrders({ orders, bcvRate, products }: any) {
                       ))}
                     </div>
                   )}
+
+                  {/* Campo para agregar Delivery a un pedido manual */}
+                  <div className="mt-4 pt-4 border-t border-stone-200">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Costo de Delivery (Opcional)</label>
+                    <div className="relative w-full sm:w-1/2">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 font-bold">$</span>
+                      <input type="number" step="0.01" min="0" value={manualDeliveryFee} onChange={e => setManualDeliveryFee(e.target.value)} className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-white font-bold" />
+                    </div>
+                  </div>
                 </div>
               </form>
             </div>
@@ -1376,8 +1408,61 @@ function AdminCategories({ categories }: any) {
   );
 }
 
+// NUEVO COMPONENTE: AdminRoutes
+function AdminRoutes({ routes }: any) {
+  const [newRoute, setNewRoute] = useState({ name: '', price: '' });
+
+  const handleAdd = async (e: any) => {
+    e.preventDefault();
+    if(newRoute.name.trim() && newRoute.price !== '') {
+      await addDoc(collection(db, 'routes'), { name: newRoute.name.trim(), price: Number(newRoute.price) });
+      setNewRoute({ name: '', price: '' });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if(window.confirm('¿Eliminar esta ruta de envío?')) await deleteDoc(doc(db, 'routes', id));
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl animate-fade-in">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800">Zonas de Entrega (Delivery)</h2>
+        <p className="text-stone-500">Configura las áreas y los costos de envío para tus clientes.</p>
+      </div>
+      
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
+        <form onSubmit={handleAdd} className="flex gap-3 mb-6 items-end">
+          <div className="flex-1">
+            <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Nombre de la Zona</label>
+            <input required type="text" value={newRoute.name} onChange={e => setNewRoute({...newRoute, name: e.target.value})} placeholder="Ej: Zona Norte, San Francisco..." className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-red-500 bg-stone-50" />
+          </div>
+          <div className="w-32">
+            <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Costo (USD)</label>
+            <input required type="number" step="0.01" min="0" value={newRoute.price} onChange={e => setNewRoute({...newRoute, price: e.target.value})} placeholder="Ej: 3.00" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-red-500 bg-stone-50" />
+          </div>
+          <button type="submit" className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md h-[46px]">Agregar</button>
+        </form>
+        
+        <ul className="divide-y divide-stone-100 border border-stone-100 rounded-2xl overflow-hidden bg-stone-50/30">
+          {routes.map((route: any) => (
+            <li key={route.id} className="py-4 px-5 flex justify-between items-center group hover:bg-white transition-colors">
+              <span className="font-bold text-gray-700 flex items-center gap-3"><MapPin className="w-4 h-4 text-stone-400" /> {route.name}</span>
+              <div className="flex items-center gap-4">
+                <span className="font-black text-green-600">${Number(route.price).toFixed(2)}</span>
+                <button onClick={() => handleDelete(route.id)} className="text-stone-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><Trash2 className="w-5 h-5" /></button>
+              </div>
+            </li>
+          ))}
+          {routes.length === 0 && <li className="py-8 text-center text-stone-500">Sin zonas configuradas (El cliente no pagará delivery).</li>}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // --- CLIENT COMPONENTS (Storefront) ---
-function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, searchQuery }: any) {
+function ClientStorefront({ products, categories, routes, cart, setCart, user, bcvRate, searchQuery }: any) {
   const [checkoutStep, setCheckoutStep] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
@@ -1393,7 +1478,8 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     deliveryAddress: user?.address || '', 
     deliveryDate: '', 
     deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', 
-    dedication: '' 
+    dedication: '',
+    deliveryRouteId: '' // NUEVO: Zona de envío seleccionada
   });
 
   const [clientPayments, setClientPayments] = useState<any[]>([]);
@@ -1419,9 +1505,13 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
 
   const updateQuantity = (id: string, delta: number) => setCart(cart.map((item: any) => item.id === id ? { ...item, quantity: item.quantity + delta } : item).filter((item: any) => item.quantity > 0));
   
-  const totalUSD = cart.reduce((sum: number, item: any) => sum + (Number(item.price) * item.quantity), 0);
+  // CÁLCULOS ACTUALIZADOS CON DELIVERY
+  const cartTotalUSD = cart.reduce((sum: number, item: any) => sum + (Number(item.price) * item.quantity), 0);
+  const deliveryFee = routes.find((r:any) => r.id === deliveryInfo.deliveryRouteId)?.price || 0;
+  const finalTotalUSD = cartTotalUSD + deliveryFee;
+  
   const totalPaidUSD = clientPayments.reduce((sum: number, p: any) => sum + Number(p.amountUSD), 0);
-  const balanceUSD = totalUSD - totalPaidUSD;
+  const balanceUSD = finalTotalUSD - totalPaidUSD;
 
   const handleAddPayment = () => {
     const amount = Number(currentPayment.amountUSD);
@@ -1441,12 +1531,16 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     const phone = "584125296272";
     const orderDisplayId = `PED-${Math.floor(Math.random() * 10000)}`;
     
+    const selectedRoute = routes.find((r:any) => r.id === deliveryInfo.deliveryRouteId);
+
     await addDoc(collection(db, 'orders'), {
       displayId: orderDisplayId,
       ...deliveryInfo,
       items: cart,
-      totalUSD: totalUSD,
-      status: clientPayments.length > 0 ? (totalPaidUSD >= totalUSD ? 'Pagado' : 'Abonado') : 'Pendiente',
+      deliveryFee: deliveryFee,
+      deliveryRouteName: selectedRoute ? selectedRoute.name : 'N/A',
+      totalUSD: finalTotalUSD, // Usamos el total final que incluye el delivery
+      status: clientPayments.length > 0 ? (totalPaidUSD >= finalTotalUSD ? 'Pagado' : 'Abonado') : 'Pendiente',
       payments: clientPayments.map(p => ({ ...p, date: new Date().toISOString() })),
       date: new Date().toISOString()
     });
@@ -1460,6 +1554,9 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     text += `▪️ Teléfono: ${deliveryInfo.recipientPhone}\n\n`;
     text += `*📍 DETALLES DE ENTREGA:*\n`;
     text += `▪️ Dirección: ${deliveryInfo.deliveryAddress}\n`;
+    if(selectedRoute) {
+      text += `▪️ Zona de Delivery: ${selectedRoute.name} ($${Number(selectedRoute.price).toFixed(2)})\n`;
+    }
     text += `▪️ Fecha: ${deliveryInfo.deliveryDate}\n`;
     text += `▪️ Horario: ${deliveryInfo.deliveryTimeSlot}\n\n`;
     
@@ -1472,7 +1569,11 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
       text += `▪️ ${item.quantity}x ${item.isExtra && item.emoji ? item.emoji : ''} ${item.name} ($${Number(item.price).toFixed(2)})\n`; 
     });
     
-    text += `\n*💰 TOTAL:* $${totalUSD.toFixed(2)} (Bs. ${(totalUSD * bcvRate).toFixed(2)})\n`;
+    text += `\n*💰 SUBTOTAL:* $${cartTotalUSD.toFixed(2)}`;
+    if(deliveryFee > 0) {
+      text += `\n*🚚 COSTO DE ENVÍO:* $${deliveryFee.toFixed(2)}`;
+    }
+    text += `\n*💵 TOTAL A PAGAR:* $${finalTotalUSD.toFixed(2)} (Bs. ${(finalTotalUSD * bcvRate).toFixed(2)})\n`;
     
     text += `\n*💳 FORMAS DE PAGO:*\n`;
     if (clientPayments.length === 0) {
@@ -1650,10 +1751,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
           {cart.length > 0 && (
             <div className="p-6 bg-white border-t border-stone-100">
               <div className="flex justify-between items-end mb-4">
-                <span className="text-stone-500 font-medium">Total</span>
+                <span className="text-stone-500 font-medium">Total de Arreglos</span>
                 <div className="text-right">
-                  <div className="text-2xl font-black text-gray-900">${totalUSD.toFixed(2)}</div>
-                  <div className="text-xs font-bold text-stone-400">Bs. {(totalUSD * bcvRate).toFixed(2)}</div>
+                  <div className="text-2xl font-black text-gray-900">${cartTotalUSD.toFixed(2)}</div>
+                  <div className="text-xs font-bold text-stone-400">Bs. {(cartTotalUSD * bcvRate).toFixed(2)}</div>
                 </div>
               </div>
               <button onClick={() => setCheckoutStep(true)} className="w-full bg-[#25D366] hover:bg-[#1ebd5a] text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2">
@@ -1731,6 +1832,19 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
 
                 <div className="space-y-4">
                   <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
+                  
+                  {routes.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Zona de Entrega (Delivery)</label>
+                      <select required value={deliveryInfo.deliveryRouteId} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryRouteId:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 text-stone-700 bg-white shadow-sm font-bold">
+                        <option value="">Selecciona tu zona...</option>
+                        {routes.map((r: any) => (
+                          <option key={r.id} value={r.id}>{r.name} - ${Number(r.price).toFixed(2)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={deliveryInfo.deliveryAddress} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryAddress:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 resize-none"/>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1751,7 +1865,14 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                 </div>
 
                 <div className="bg-stone-50 p-5 rounded-2xl border border-stone-100">
-                  <h4 className="text-sm font-bold mb-4 flex items-center gap-2 text-blue-600 uppercase tracking-wider"><CreditCard className="w-4 h-4"/> 4. Forma de Pago</h4>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-sm font-bold flex items-center gap-2 text-blue-600 uppercase tracking-wider"><CreditCard className="w-4 h-4"/> 4. Forma de Pago</h4>
+                    <div className="text-right">
+                       <span className="text-xs text-stone-500 font-bold">Total a Pagar:</span>
+                       <span className="ml-2 font-black text-lg text-gray-900">${finalTotalUSD.toFixed(2)}</span>
+                    </div>
+                  </div>
+
                   {balanceUSD > 0 && (
                     <div className="space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1762,10 +1883,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                           <option value="Zinli">Zinli</option>
                           <option value="Binance">Binance Pay</option>
                         </select>
-                        <input type="number" step="0.01" max={balanceUSD} placeholder={`Monto USD (Deuda: $${balanceUSD.toFixed(2)})`} value={currentPayment.amountUSD} onChange={e=>setCurrentPayment({...currentPayment, amountUSD:e.target.value})} className="w-full px-3 py-3 border border-stone-200 rounded-xl text-sm outline-none"/>
+                        <input type="number" step="0.01" max={balanceUSD} placeholder={`Monto USD (Deuda: $${balanceUSD.toFixed(2)})`} value={currentPayment.amountUSD} onChange={e=>setCurrentPayment({...currentPayment, amountUSD:e.target.value})} className="w-full px-3 py-3 border border-stone-200 rounded-xl text-sm outline-none font-bold"/>
                       </div>
                       {currentPayment.method === 'Pago Móvil' && currentPayment.amountUSD && <p className="text-[11px] text-blue-600 font-bold bg-blue-50 p-2 rounded-lg">Monto en Bolívares: Bs. {(Number(currentPayment.amountUSD) * bcvRate).toFixed(2)}</p>}
-                      <button type="button" onClick={handleAddPayment} className="w-full bg-stone-800 hover:bg-black text-white text-sm py-3 rounded-xl font-bold transition-all shadow-md">Registrar este pago</button>
+                      <button type="button" onClick={handleAddPayment} className="w-full bg-stone-800 hover:bg-black text-white text-sm py-3 rounded-xl font-bold transition-all shadow-md">Añadir soporte de pago</button>
                     </div>
                   )}
                   {clientPayments.length > 0 && (
