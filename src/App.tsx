@@ -1895,7 +1895,7 @@ function AdminOrders({ orders, bcvRate, products }) {
 function AdminProducts({ products, categories }) {
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentProduct, setCurrentProduct] = useState({ id: '', name: '', price: '', image: '', description: '', categoryId: '', badge: '', isExtra: false, emoji: '' });
+  const [currentProduct, setCurrentProduct] = useState({ id: '', name: '', price: '', image: '', description: '', categoryId: '', badge: '', isExtra: false, emoji: '', isAvailable: true });
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleImageUpload = async (e) => {
@@ -1935,7 +1935,8 @@ function AdminProducts({ products, categories }) {
       categoryId: currentProduct.categoryId || (categories[0]?.id || ''),
       badge: currentProduct.badge || '',
       isExtra: currentProduct.isExtra,
-      emoji: currentProduct.emoji || ''
+      emoji: currentProduct.emoji || '',
+      isAvailable: currentProduct.isAvailable !== false
     };
     
     if (currentProduct.id) await updateDoc(doc(db, 'products', currentProduct.id), productData);
@@ -1956,7 +1957,7 @@ function AdminProducts({ products, categories }) {
           <h2 className="text-2xl font-bold text-gray-800">Catálogo de Productos y Extras</h2>
           <p className="text-stone-500">Gestiona tu oferta de arreglos</p>
         </div>
-        <button onClick={() => { setCurrentProduct({ id: '', name: '', price: '', image: '', description: '', categoryId: categories[0]?.id || '', badge: '', isExtra: false, emoji: '' }); setIsEditing(true); }}
+        <button onClick={() => { setCurrentProduct({ id: '', name: '', price: '', image: '', description: '', categoryId: categories[0]?.id || '', badge: '', isExtra: false, emoji: '', isAvailable: true }); setIsEditing(true); }}
           className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg text-sm"
         >
           <Plus className="w-5 h-5" /> Nuevo Elemento
@@ -1975,6 +1976,17 @@ function AdminProducts({ products, categories }) {
                 <option value="false">📦 Producto Normal (Arreglos, Cajas)</option>
                 <option value="true">🎈 Extra Especial (Upsell en carrito)</option>
               </select>
+            </div>
+
+            <div className="md:col-span-2 bg-stone-50 p-4 rounded-2xl border border-stone-200 flex items-center justify-between">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase">Disponibilidad en Tienda</label>
+                <p className="text-[10px] text-stone-500 mt-0.5">Si está apagado, los clientes no podrán verlo ni comprarlo.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={currentProduct.isAvailable !== false} onChange={e => setCurrentProduct({...currentProduct, isAvailable: e.target.checked})} className="sr-only peer" />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
+              </label>
             </div>
 
             <div>
@@ -2075,7 +2087,14 @@ function AdminProducts({ products, categories }) {
                   </div>
                 </td>
                 <td className="p-4 text-center">
-                   {product.isExtra ? <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">Extra / Upsell</span> : <span className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1 rounded-full border border-stone-200">Catálogo</span>}
+                   {product.isExtra ? <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 block w-max mx-auto">Extra / Upsell</span> : <span className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1 rounded-full border border-stone-200 block w-max mx-auto">Catálogo</span>}
+                   <div className="mt-2">
+                     {product.isAvailable !== false ? (
+                       <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100 inline-flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Visible</span>
+                     ) : (
+                       <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 inline-flex items-center gap-1"><X className="w-3 h-3"/> Oculto</span>
+                     )}
+                   </div>
                 </td>
                 <td className="p-4 text-right font-black text-gray-900">${Number(product.price).toFixed(2)}</td>
                 <td className="p-4 flex justify-center gap-2">
@@ -2141,6 +2160,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
   const [checkoutStep, setCheckoutStep] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState('default');
   const [showToast, setShowToast] = useState(false);
   
   const [previewProduct, setPreviewProduct] = useState(null);
@@ -2271,10 +2291,11 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     setCart([]); setClientPayments([]); setCheckoutStep(false);
   };
 
-  const mainProducts = products.filter((p) => !p.isExtra);
-  const extraProducts = products.filter((p) => p.isExtra);
+  const availableProducts = products.filter(p => p.isAvailable !== false);
+  const mainProducts = availableProducts.filter((p) => !p.isExtra);
+  const extraProducts = availableProducts.filter((p) => p.isExtra);
 
-  const filteredProducts = mainProducts.filter((p) => {
+  let filteredProducts = mainProducts.filter((p) => {
     const matchCategory = selectedCategory === 'all' || p.categoryId === selectedCategory;
     const matchSearch = String(p.name).toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -2285,6 +2306,12 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
 
     return matchCategory && matchSearch && matchPrice;
   });
+
+  if (sortOrder === 'price-asc') {
+    filteredProducts.sort((a, b) => Number(a.price) - Number(b.price));
+  } else if (sortOrder === 'price-desc') {
+    filteredProducts.sort((a, b) => Number(b.price) - Number(a.price));
+  }
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 xl:gap-8 animate-fade-in relative w-full">
@@ -2333,6 +2360,14 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
             <button onClick={() => setPriceFilter('under20')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'under20' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>Menos de $20</button>
             <button onClick={() => setPriceFilter('20to40')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === '20to40' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>$20 - $40</button>
             <button onClick={() => setPriceFilter('premium')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'premium' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>Premium</button>
+            
+            <div className="ml-auto flex items-center gap-2 pl-2 border-l border-stone-200 shrink-0">
+              <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="bg-white border border-stone-200 text-stone-600 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-red-500 transition-colors shadow-sm cursor-pointer">
+                <option value="default">✨ Relevantes</option>
+                <option value="price-asc">📈 Menor a Mayor Precio</option>
+                <option value="price-desc">📉 Mayor a Menor Precio</option>
+              </select>
+            </div>
           </div>
         </div>
 
