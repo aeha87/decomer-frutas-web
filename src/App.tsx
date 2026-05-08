@@ -399,8 +399,12 @@ function Footer() {
           <p className="text-sm max-w-md text-stone-400 mx-auto">Especialistas en arreglos frutales, fresas con chocolate y desayunos sorpresa. ¡Endulzamos tus mejores momentos!</p>
         </div>
         <div className="flex flex-wrap justify-center gap-4 mt-2">
-          <a href="https://www.instagram.com/decomerfrutas/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-pink-400 hover:text-pink-300 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg"><Instagram className="w-5 h-5" /><span className="font-medium text-sm">Instagram</span></a>
-          <a href="https://www.facebook.com/DecomerFrutasMCBO" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-400 hover:text-blue-300 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg"><Facebook className="w-5 h-5" /><span className="font-medium text-sm">Facebook</span></a>
+          <a href="https://www.instagram.com/decomerfrutas/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-pink-400 hover:text-pink-300 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg transition-colors"><Instagram className="w-5 h-5" /><span className="font-medium text-sm">Instagram</span></a>
+          <a href="https://www.facebook.com/DecomerFrutasMCBO" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-400 hover:text-blue-300 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg transition-colors"><Facebook className="w-5 h-5" /><span className="font-medium text-sm">Facebook</span></a>
+          <a href="https://www.tiktok.com/@decomerfrutas" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-white hover:text-stone-300 bg-stone-800 px-5 py-2.5 rounded-full shadow-lg transition-colors">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
+            <span className="font-medium text-sm">TikTok</span>
+          </a>
         </div>
       </div>
     </footer>
@@ -1361,27 +1365,33 @@ function AdminKPIs({ orders, products, expenses, bcvRate }) {
         </div>
       </div>
 
-      {/* 🔴 TARJETAS DE RESUMEN (KPIs) AJUSTADAS PARA NO DESBORDAR */}
+      {/* 🔴 TARJETAS DE RESUMEN (KPIs) AJUSTADAS PARA QUE LOS TEXTOS NO DESAPAREZCAN */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
-        <div className="bg-white border border-stone-200 p-5 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow min-w-0">
+        <div className="bg-white border border-stone-200 p-4 lg:p-6 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow flex flex-col justify-between h-full">
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><TrendingUp className="w-24 h-24 text-blue-500"/></div>
-          <p className="text-stone-500 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500 block"></span> Ingresos (Ventas)</p>
-          <p className="text-3xl lg:text-4xl font-black text-gray-900 relative z-10 mt-2 truncate" title={`$${monthSalesUSD.toFixed(2)}`}>${monthSalesUSD.toFixed(2)}</p>
-          <p className="text-sm text-stone-500 mt-2 font-medium relative z-10 bg-stone-50 inline-block px-3 py-1 rounded-lg border border-stone-100">{monthOrders.length} pedidos pagados</p>
+          <p className="text-stone-500 text-[11px] lg:text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500 block"></span> Ingresos (Ventas)</p>
+          <p className="text-2xl lg:text-3xl xl:text-4xl font-black text-gray-900 relative z-10 mt-2 break-words tracking-tighter">
+            ${monthSalesUSD.toFixed(2)}
+          </p>
+          <p className="text-xs lg:text-sm text-stone-500 mt-2 font-medium relative z-10 bg-stone-50 inline-block px-3 py-1 rounded-lg border border-stone-100 max-w-max">{monthOrders.length} pedidos pagados</p>
         </div>
         
-        <div className="bg-white border border-stone-200 p-5 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow min-w-0">
+        <div className="bg-white border border-stone-200 p-4 lg:p-6 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow flex flex-col justify-between h-full">
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Receipt className="w-24 h-24 text-red-500"/></div>
-          <p className="text-stone-500 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 block"></span> Egresos (Gastos)</p>
-          <p className="text-3xl lg:text-4xl font-black text-red-600 relative z-10 mt-2 truncate" title={`-$${monthExpensesUSD.toFixed(2)}`}>-${monthExpensesUSD.toFixed(2)}</p>
-          <p className="text-sm text-stone-500 mt-2 font-medium relative z-10 bg-stone-50 inline-block px-3 py-1 rounded-lg border border-stone-100">{monthExpensesList.length} registros</p>
+          <p className="text-stone-500 text-[11px] lg:text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 block"></span> Egresos (Gastos)</p>
+          <p className="text-2xl lg:text-3xl xl:text-4xl font-black text-red-600 relative z-10 mt-2 break-words tracking-tighter">
+            -${monthExpensesUSD.toFixed(2)}
+          </p>
+          <p className="text-xs lg:text-sm text-stone-500 mt-2 font-medium relative z-10 bg-stone-50 inline-block px-3 py-1 rounded-lg border border-stone-100 max-w-max">{monthExpensesList.length} registros</p>
         </div>
         
-        <div className="bg-stone-900 border border-stone-800 p-5 rounded-3xl shadow-xl text-white relative overflow-hidden group min-w-0">
+        <div className="bg-stone-900 border border-stone-800 p-4 lg:p-6 rounded-3xl shadow-xl text-white relative overflow-hidden group flex flex-col justify-between h-full">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><DollarSign className="w-24 h-24 text-green-400"/></div>
-          <p className="text-stone-400 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-400 block"></span> Ganancia Neta Real</p>
-          <p className={`text-4xl lg:text-5xl font-black relative z-10 mt-2 truncate ${netProfitUSD >= 0 ? 'text-white' : 'text-red-400'}`} title={`$${netProfitUSD.toFixed(2)}`}>${netProfitUSD.toFixed(2)}</p>
-          <p className="text-sm text-stone-400 mt-2 font-medium relative z-10 bg-stone-800 inline-block px-3 py-1 rounded-lg border border-stone-700">Libre de gastos</p>
+          <p className="text-stone-400 text-[11px] lg:text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-400 block"></span> Ganancia Neta Real</p>
+          <p className={`text-3xl lg:text-4xl xl:text-5xl font-black relative z-10 mt-2 break-words tracking-tighter ${netProfitUSD >= 0 ? 'text-white' : 'text-red-400'}`}>
+            ${netProfitUSD.toFixed(2)}
+          </p>
+          <p className="text-xs lg:text-sm text-stone-400 mt-2 font-medium relative z-10 bg-stone-800 inline-block px-3 py-1 rounded-lg border border-stone-700 max-w-max">Libre de gastos</p>
         </div>
       </div>
 
