@@ -6,7 +6,7 @@ import {
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook,
   CheckCircle, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, 
   Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock,
-  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save, ShieldAlert, Megaphone, Ticket, TrendingDown, Award, ScanBarcode, Settings
+  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save, ShieldAlert, Megaphone, Ticket, TrendingDown, Award, ScanBarcode, Settings, Menu
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -72,8 +72,20 @@ export default function App() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  
+  // Nuevos Estados para Menús Pop-up/Deslizables
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isAdminSidebarOpen, setIsAdminSidebarOpen] = useState(true);
 
   const [view, setView] = useState('app');
+
+  useEffect(() => {
+    // Detectar tamaño de pantalla para abrir/cerrar sidebar admin por defecto
+    const handleResize = () => { if(window.innerWidth < 1024) setIsAdminSidebarOpen(false); };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const unsubBcv = onSnapshot(doc(db, 'settings', 'bcv'), (docSnap) => {
@@ -206,7 +218,14 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col font-sans overflow-x-hidden w-full">
+    <div className="min-h-screen bg-stone-50 flex flex-col font-sans overflow-x-hidden w-full relative">
+      <style>{`
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        .animate-slide-in-left { animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+      `}</style>
+      
       <Navbar 
         user={currentUser} 
         onLogout={handleLogout} 
@@ -219,22 +238,25 @@ export default function App() {
         setSearchQuery={setSearchQuery}
         isSearchExpanded={isSearchExpanded}
         setIsSearchExpanded={setIsSearchExpanded}
+        onOpenCart={() => setIsCartOpen(true)}
+        isAdminSidebarOpen={isAdminSidebarOpen}
+        onToggleSidebar={() => setIsAdminSidebarOpen(!isAdminSidebarOpen)}
       />
-      {/* Ccontenedor Expandido - Removido container mx-auto para que cubra toda la pantalla */}
+      
       <main className="flex-grow w-full max-w-[2000px] mx-auto px-4 md:px-8 py-8 relative">
         {currentUser?.role === 'admin' ? (
-          <AdminDashboard products={products} categories={categories} orders={orders} expenses={expenses} coupons={coupons} bcvRate={bcvRate} clients={clients} promotions={promotions} loyaltySettings={loyaltySettings} />
+          <AdminDashboard 
+            products={products} categories={categories} orders={orders} expenses={expenses} 
+            coupons={coupons} bcvRate={bcvRate} clients={clients} promotions={promotions} 
+            loyaltySettings={loyaltySettings} 
+            isAdminSidebarOpen={isAdminSidebarOpen} setIsAdminSidebarOpen={setIsAdminSidebarOpen} 
+          />
         ) : (
           <ClientStorefront 
-            products={products} 
-            categories={categories} 
-            cart={cart} 
-            setCart={setCart} 
-            user={currentUser} 
-            bcvRate={bcvRate}
-            searchQuery={searchQuery}
-            coupons={coupons}
+            products={products} categories={categories} cart={cart} setCart={setCart} 
+            user={currentUser} bcvRate={bcvRate} searchQuery={searchQuery} coupons={coupons} 
             loyaltySettings={loyaltySettings}
+            isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen}
           />
         )}
       </main>
@@ -339,12 +361,17 @@ function AuthScreen({ view, setView }) {
   );
 }
 
-function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onLoginClick, searchQuery, setSearchQuery, isSearchExpanded, setIsSearchExpanded }) {
+function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onLoginClick, searchQuery, setSearchQuery, isSearchExpanded, setIsSearchExpanded, onOpenCart, isAdminSidebarOpen, onToggleSidebar }) {
   return (
     <nav className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 print:hidden transition-all w-full">
       <div className="w-full max-w-[2000px] mx-auto px-4 md:px-8 py-3 sm:py-4 flex justify-between items-center">
-        <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
-          <img src="/logo.png" alt="Decomer Frutas" className="h-10 sm:h-14 w-auto drop-shadow-sm hover:scale-105 transition-transform" />
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          {user?.role === 'admin' && (
+            <button onClick={onToggleSidebar} title={isAdminSidebarOpen ? "Ocultar menú" : "Mostrar menú"} className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl transition-colors hidden md:block">
+              <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+          )}
+          <img src="/logo.png" alt="Decomer Frutas" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="h-10 sm:h-14 w-auto drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" />
         </div>
         
         <div className="flex items-center gap-1 sm:gap-4">
@@ -376,6 +403,9 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
                 <LogOut className="w-5 h-5" />
                 <span className="hidden sm:block text-sm font-medium">Salir</span>
               </button>
+              <button onClick={onToggleSidebar} className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl transition-colors md:hidden ml-1">
+                <Menu className="w-5 h-5" />
+              </button>
             </>
           ) : (
             <div className="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-0">
@@ -391,7 +421,7 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
                 )}
               </div>
 
-              <div className="relative text-stone-600 hover:text-red-600 transition-colors cursor-pointer group p-1 sm:p-2" onClick={() => document.getElementById('cart-section')?.scrollIntoView({behavior: 'smooth'})}>
+              <div className="relative text-stone-600 hover:text-red-600 transition-colors cursor-pointer group p-1 sm:p-2" onClick={onOpenCart}>
                 <ShoppingCart className="w-6 h-6 group-hover:scale-110 transition-transform" />
                 {cartCount > 0 && (
                   <span className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-red-600 text-white text-[10px] sm:text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center animate-bounce shadow-md">{cartCount}</span>
@@ -432,46 +462,58 @@ function Footer() {
 }
 
 // --- ADMIN COMPONENTS ---
-function AdminDashboard({ products, categories, orders, expenses, coupons, bcvRate, clients, promotions, loyaltySettings }) {
+function AdminDashboard({ products, categories, orders, expenses, coupons, bcvRate, clients, promotions, loyaltySettings, isAdminSidebarOpen, setIsAdminSidebarOpen }) {
   const [activeTab, setActiveTab] = useState('orders');
 
   return (
-    <div className="animate-fade-in flex flex-col xl:flex-row gap-6 w-full">
-      <div className="w-full xl:w-64 shrink-0 print:hidden">
-        <div className="bg-white rounded-3xl shadow-sm border border-stone-200 p-5 sticky top-24">
-          <div className="flex items-center gap-3 mb-6 px-2">
-            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600"><Star className="w-5 h-5" /></div>
-            <div>
-              <h3 className="font-bold text-gray-800 leading-tight">Administración</h3>
-              <p className="text-[10px] text-stone-500 uppercase tracking-widest">Decomer Frutas</p>
+    <div className="animate-fade-in flex flex-col md:flex-row gap-6 w-full relative">
+      
+      {/* Fondo oscuro en Móvil al abrir el Sidebar */}
+      {isAdminSidebarOpen && (
+         <div className="fixed inset-0 bg-stone-900/60 z-30 lg:hidden backdrop-blur-sm" onClick={() => setIsAdminSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar Administrativo Deslizable */}
+      {isAdminSidebarOpen && (
+      <div className="fixed lg:static inset-y-0 left-0 z-40 w-72 lg:w-64 shrink-0 bg-white lg:bg-transparent shadow-2xl lg:shadow-none animate-slide-in-left lg:animate-none flex flex-col max-h-screen">
+        <div className="bg-white rounded-r-3xl lg:rounded-3xl shadow-sm border-r lg:border border-stone-200 p-5 h-full overflow-y-auto lg:sticky lg:top-24">
+          <div className="flex items-center justify-between mb-6 px-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600"><Star className="w-5 h-5" /></div>
+              <div>
+                <h3 className="font-bold text-gray-800 leading-tight">Panel Admin</h3>
+                <p className="text-[10px] text-stone-500 uppercase tracking-widest">Decomer Frutas</p>
+              </div>
             </div>
+            <button className="lg:hidden bg-stone-100 p-1.5 rounded-lg text-stone-500" onClick={() => setIsAdminSidebarOpen(false)}><X className="w-5 h-5"/></button>
           </div>
           
-          <nav className="flex flex-row xl:flex-col gap-2 overflow-x-auto xl:overflow-visible no-scrollbar pb-2 xl:pb-0">
-            <button onClick={() => setActiveTab('kpis')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'kpis' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingUp className="w-5 h-5" /> <span className="hidden sm:inline">Dashboard</span></button>
-            <button onClick={() => setActiveTab('expenses')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'expenses' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingDown className="w-5 h-5" /> <span className="hidden sm:inline">Gastos y Egresos</span></button>
-            <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'orders' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}>
+          <nav className="flex flex-col gap-2">
+            <button onClick={() => {setActiveTab('kpis'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'kpis' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingUp className="w-5 h-5" /> Dashboard</button>
+            <button onClick={() => {setActiveTab('expenses'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'expenses' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingDown className="w-5 h-5" /> Gastos y Egresos</button>
+            <button onClick={() => {setActiveTab('orders'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'orders' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}>
               <ShoppingBag className="w-5 h-5" /> Pedidos 
               {orders.filter((o)=>o.status==='Pendiente').length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{orders.filter((o)=>o.status==='Pendiente').length}</span>}
             </button>
             
-            <button onClick={() => setActiveTab('delivery')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> <span className="hidden sm:inline">Rutas de Entrega</span></button>
+            <button onClick={() => {setActiveTab('delivery'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> Rutas de Entrega</button>
             
-            <div className="hidden xl:block pt-4 mt-4 border-t border-stone-100"></div>
+            <div className="pt-4 mt-2 border-t border-stone-100"></div>
 
-            <button onClick={() => setActiveTab('clients')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'clients' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
-            <button onClick={() => setActiveTab('promos')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'promos' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Zap className="w-5 h-5" /> Promociones</button>
-            <button onClick={() => setActiveTab('coupons')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'coupons' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Ticket className="w-5 h-5" /> Cupones</button>
+            <button onClick={() => {setActiveTab('clients'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'clients' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
+            <button onClick={() => {setActiveTab('promos'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'promos' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Zap className="w-5 h-5" /> Promociones</button>
+            <button onClick={() => {setActiveTab('coupons'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'coupons' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Ticket className="w-5 h-5" /> Cupones</button>
 
-            <div className="hidden xl:block pt-4 mt-4 border-t border-stone-100"></div>
+            <div className="pt-4 mt-2 border-t border-stone-100"></div>
             
-            <button onClick={() => setActiveTab('products')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
-            <button onClick={() => setActiveTab('categories')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
+            <button onClick={() => {setActiveTab('products'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
+            <button onClick={() => {setActiveTab('categories'); if(window.innerWidth < 1024) setIsAdminSidebarOpen(false);}} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm w-full ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
           </nav>
         </div>
       </div>
+      )}
 
-      <div className="flex-1 min-w-0 w-full">
+      <div className="flex-1 min-w-0 w-full transition-all duration-300">
         {activeTab === 'kpis' && <AdminKPIs orders={orders} expenses={expenses} bcvRate={bcvRate} />}
         {activeTab === 'expenses' && <AdminExpenses expenses={expenses} bcvRate={bcvRate} />}
         {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} loyaltySettings={loyaltySettings} />}
@@ -2428,7 +2470,7 @@ function AdminCategories({ categories }) {
 }
 
 // --- CLIENT COMPONENTS (Storefront) ---
-function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, searchQuery, coupons, loyaltySettings }) {
+function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, searchQuery, coupons, loyaltySettings, isCartOpen, setIsCartOpen }) {
   const [checkoutStep, setCheckoutStep] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
@@ -2483,8 +2525,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     if (isOutOfStock) return alert('Lo sentimos, este producto está agotado.');
     addToCart(product);
     setTimeout(() => {
-      setCheckoutStep(true);
-      window.scrollTo(0, 0);
+      setIsCartOpen(true);
     }, 100);
   }
 
@@ -2682,7 +2723,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
   }
 
   return (
-    <div className="flex flex-col xl:flex-row gap-6 xl:gap-8 animate-fade-in relative w-full">
+    <div className="flex flex-col animate-fade-in relative w-full">
       <a href="https://wa.me/584125296272" target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:bg-[#1ebd5a] transition-transform hover:scale-110 z-40 flex items-center justify-center print:hidden group">
         <MessageCircle className="w-7 h-7" />
       </a>
@@ -2741,7 +2782,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
           {filteredProducts.map((product) => {
             const isOutOfStock = product.stock !== '' && product.stock !== undefined && Number(product.stock) <= 0;
 
@@ -2791,104 +2832,110 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
         </div>
       </div>
 
-      <div id="cart-section" className="w-full xl:w-[400px] shrink-0">
-        <div className="bg-white rounded-3xl shadow-xl border border-stone-100 sticky top-24 overflow-hidden flex flex-col xl:max-h-[calc(100vh-8rem)]">
-          <div className="bg-stone-900 p-6 text-white flex items-center justify-between shrink-0">
-            <h3 className="text-lg font-bold flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Mi Pedido</h3>
-            <span className="bg-stone-800 text-stone-300 text-xs font-bold px-2 py-1 rounded-md">{cart.reduce((a,c)=>a+c.quantity,0)} items</span>
-          </div>
-          
-          <div className="p-6 flex-grow overflow-y-auto bg-stone-50/50">
-            {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-stone-400 py-10 opacity-70">
-                <ShoppingCart className="w-16 h-16 mb-4" />
-                <p className="font-medium text-center">Tu carrito está vacío.</p>
+      {/* --- POP-UP CARRITO LATERAL (DRAWER) --- */}
+      {isCartOpen && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[70] flex justify-end animate-fade-in" onClick={() => setIsCartOpen(false)}>
+          <div className="w-full max-w-md h-full bg-stone-50 shadow-2xl flex flex-col animate-slide-in-right" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-stone-900 p-6 text-white flex items-center justify-between shrink-0">
+              <h3 className="text-lg font-bold flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Mi Pedido</h3>
+              <div className="flex items-center gap-4">
+                <span className="bg-stone-800 text-stone-300 text-xs font-bold px-2 py-1 rounded-md">{cart.reduce((a,c)=>a+c.quantity,0)} items</span>
+                <button onClick={() => setIsCartOpen(false)} className="text-stone-400 hover:text-white transition-colors"><X className="w-6 h-6"/></button>
               </div>
-            ) : (
-              cart.map((item) => (
-                <div key={item.id} className="flex gap-4 items-center mb-5 bg-white p-3 rounded-2xl shadow-sm border border-stone-100">
-                  {item.isExtra ? (
-                    <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center text-3xl shrink-0">{item.emoji || '✨'}</div>
-                  ) : (
-                    <img src={item.image || 'https://via.placeholder.com/150'} className="w-16 h-16 rounded-xl object-cover bg-stone-100 text-[8px] text-center" alt={item.name} />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-gray-800 line-clamp-1">{item.name}</h4>
-                    <p className="text-red-600 font-black text-sm mt-0.5">${Number(item.price).toFixed(2)}</p>
-                  </div>
-                  <div className="flex items-center bg-stone-100 rounded-lg p-1 shrink-0">
-                    <button onClick={() => updateQuantity(item, -1)} className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-white rounded-md transition-all">-</button>
-                    <span className="w-6 text-center text-sm font-bold text-gray-800">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item, 1)} className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-white rounded-md transition-all">+</button>
-                  </div>
-                </div>
-              ))
-            )}
-
-            {cart.length > 0 && extraProducts.length > 0 && (
-              <div className="mt-8">
-                <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Star className="w-3 h-3"/> Agrega un Extra</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {extraProducts.map((extra) => {
-                    const isOutOfStock = extra.stock !== '' && extra.stock !== undefined && Number(extra.stock) <= 0;
-                    return (
-                    <button disabled={isOutOfStock} key={extra.id} onClick={() => addToCart(extra)} className="bg-white border border-stone-200 hover:border-pink-300 disabled:opacity-50 disabled:hover:border-stone-200 p-2 rounded-xl flex items-center gap-2 text-left transition-all hover:shadow-sm group">
-                      <div className="bg-stone-50 w-8 h-8 rounded-lg flex items-center justify-center text-lg group-hover:scale-110 transition-transform shrink-0">{extra.emoji || '✨'}</div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-gray-800 leading-tight truncate">{extra.name}</p>
-                        <p className="text-[10px] text-red-500 font-bold">{isOutOfStock ? 'Agotado' : `+$${Number(extra.price).toFixed(2)}`}</p>
-                      </div>
-                    </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            
-            {cart.length > 0 && (
-              <div className="mt-6 pt-6 border-t border-stone-200">
-                <p className="text-xs font-bold text-stone-600 uppercase mb-2 flex items-center gap-1"><Ticket className="w-3 h-3"/> Cupón de Descuento</p>
-                <div className="flex gap-2">
-                  <input type="text" placeholder="Ej: MAMA20" value={couponCode} onChange={e=>setCouponCode(e.target.value)} disabled={!!appliedCoupon} className="flex-1 px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm outline-none font-bold uppercase disabled:bg-stone-100" />
-                  {!appliedCoupon ? (
-                    <button onClick={applyCoupon} className="bg-stone-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm">Aplicar</button>
-                  ) : (
-                    <button onClick={() => {setAppliedCoupon(null); setCouponCode('');}} className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm font-bold shadow-sm"><X className="w-4 h-4"/></button>
-                  )}
-                </div>
-                {appliedCoupon && <p className="text-[10px] font-bold text-green-600 mt-1.5 ml-1">✓ Cupón {appliedCoupon.code} activado</p>}
-              </div>
-            )}
-          </div>
-
-          {cart.length > 0 && (
-            <div className="p-6 bg-white border-t border-stone-100 shrink-0">
-              <div className="space-y-1 mb-4">
-                <div className="flex justify-between items-center text-sm text-stone-500">
-                  <span>Subtotal</span>
-                  <span>${subtotalUSD.toFixed(2)}</span>
-                </div>
-                {appliedCoupon && (
-                  <div className="flex justify-between items-center text-sm text-pink-500 font-bold">
-                    <span>Descuento</span>
-                    <span>-${discountUSD.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-end pt-2 border-t border-stone-100 mt-2">
-                  <span className="text-stone-500 font-bold">Total a Pagar</span>
-                  <div className="text-right">
-                    <div className="text-2xl font-black text-gray-900">${totalUSD.toFixed(2)}</div>
-                    <div className="text-[10px] font-bold text-stone-400">Bs. {(totalUSD * bcvRate).toFixed(2)}</div>
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setCheckoutStep(true)} className="w-full bg-[#25D366] hover:bg-[#1ebd5a] text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2">
-                Ir a Pagar
-              </button>
             </div>
-          )}
+            
+            <div className="p-6 flex-grow overflow-y-auto bg-stone-50/50">
+              {cart.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-stone-400 py-10 opacity-70">
+                  <ShoppingCart className="w-16 h-16 mb-4" />
+                  <p className="font-medium text-center">Tu carrito está vacío.</p>
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div key={item.id} className="flex gap-4 items-center mb-5 bg-white p-3 rounded-2xl shadow-sm border border-stone-100">
+                    {item.isExtra ? (
+                      <div className="w-16 h-16 rounded-xl bg-stone-100 flex items-center justify-center text-3xl shrink-0">{item.emoji || '✨'}</div>
+                    ) : (
+                      <img src={item.image || 'https://via.placeholder.com/150'} className="w-16 h-16 rounded-xl object-cover bg-stone-100 text-[8px] text-center" alt={item.name} />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-bold text-gray-800 line-clamp-1">{item.name}</h4>
+                      <p className="text-red-600 font-black text-sm mt-0.5">${Number(item.price).toFixed(2)}</p>
+                    </div>
+                    <div className="flex items-center bg-stone-100 rounded-lg p-1 shrink-0">
+                      <button onClick={() => updateQuantity(item, -1)} className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-white rounded-md transition-all">-</button>
+                      <span className="w-6 text-center text-sm font-bold text-gray-800">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item, 1)} className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-white rounded-md transition-all">+</button>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {cart.length > 0 && extraProducts.length > 0 && (
+                <div className="mt-8">
+                  <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Star className="w-3 h-3"/> Agrega un Extra</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {extraProducts.map((extra) => {
+                      const isOutOfStock = extra.stock !== '' && extra.stock !== undefined && Number(extra.stock) <= 0;
+                      return (
+                      <button disabled={isOutOfStock} key={extra.id} onClick={() => addToCart(extra)} className="bg-white border border-stone-200 hover:border-pink-300 disabled:opacity-50 disabled:hover:border-stone-200 p-2 rounded-xl flex items-center gap-2 text-left transition-all hover:shadow-sm group">
+                        <div className="bg-stone-50 w-8 h-8 rounded-lg flex items-center justify-center text-lg group-hover:scale-110 transition-transform shrink-0">{extra.emoji || '✨'}</div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-gray-800 leading-tight truncate">{extra.name}</p>
+                          <p className="text-[10px] text-red-500 font-bold">{isOutOfStock ? 'Agotado' : `+$${Number(extra.price).toFixed(2)}`}</p>
+                        </div>
+                      </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {cart.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-stone-200">
+                  <p className="text-xs font-bold text-stone-600 uppercase mb-2 flex items-center gap-1"><Ticket className="w-3 h-3"/> Cupón de Descuento</p>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="Ej: MAMA20" value={couponCode} onChange={e=>setCouponCode(e.target.value)} disabled={!!appliedCoupon} className="flex-1 px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm outline-none font-bold uppercase disabled:bg-stone-100" />
+                    {!appliedCoupon ? (
+                      <button onClick={applyCoupon} className="bg-stone-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm">Aplicar</button>
+                    ) : (
+                      <button onClick={() => {setAppliedCoupon(null); setCouponCode('');}} className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm font-bold shadow-sm"><X className="w-4 h-4"/></button>
+                    )}
+                  </div>
+                  {appliedCoupon && <p className="text-[10px] font-bold text-green-600 mt-1.5 ml-1">✓ Cupón {appliedCoupon.code} activado</p>}
+                </div>
+              )}
+            </div>
+
+            {cart.length > 0 && (
+              <div className="p-6 bg-white border-t border-stone-100 shrink-0">
+                <div className="space-y-1 mb-4">
+                  <div className="flex justify-between items-center text-sm text-stone-500">
+                    <span>Subtotal</span>
+                    <span>${subtotalUSD.toFixed(2)}</span>
+                  </div>
+                  {appliedCoupon && (
+                    <div className="flex justify-between items-center text-sm text-pink-500 font-bold">
+                      <span>Descuento</span>
+                      <span>-${discountUSD.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-end pt-2 border-t border-stone-100 mt-2">
+                    <span className="text-stone-500 font-bold">Total a Pagar</span>
+                    <div className="text-right">
+                      <div className="text-2xl font-black text-gray-900">${totalUSD.toFixed(2)}</div>
+                      <div className="text-[10px] font-bold text-stone-400">Bs. {(totalUSD * bcvRate).toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => { setIsCartOpen(false); setCheckoutStep(true); }} className="w-full bg-[#25D366] hover:bg-[#1ebd5a] text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2">
+                  Ir a Pagar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {previewProduct && (
         <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
