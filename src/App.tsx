@@ -6,7 +6,7 @@ import {
   ShoppingCart, User, Lock, Mail, Phone, MapPin, Plus, Trash2, Edit, LogOut, Instagram, Facebook,
   CheckCircle, X, Package, TrendingUp, DollarSign, List, Tag, ShoppingBag, CreditCard, Activity, Calendar, 
   Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock,
-  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save, ShieldAlert, Megaphone, Ticket, TrendingDown, Award, ScanBarcode
+  Map, ArrowUp, ArrowDown, Share2, AlertTriangle, Save, ShieldAlert, Megaphone, Ticket, TrendingDown, Award, ScanBarcode, Settings
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -67,6 +67,7 @@ export default function App() {
   const [coupons, setCoupons] = useState([]);
   const [systemUsers, setSystemUsers] = useState([]); 
   const [bcvRate, setBcvRate] = useState(36.50);
+  const [loyaltySettings, setLoyaltySettings] = useState({ enabled: true, pointsPerDollar: 1 });
   const [cart, setCart] = useState([]);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,7 +96,14 @@ export default function App() {
         fetchBcv();
       }
     });
-    return () => unsubBcv();
+
+    const unsubLoyalty = onSnapshot(doc(db, 'settings', 'loyalty'), (docSnap) => {
+      if (docSnap.exists()) {
+        setLoyaltySettings(docSnap.data());
+      }
+    });
+
+    return () => { unsubBcv(); unsubLoyalty(); };
   }, []);
 
   useEffect(() => {
@@ -190,7 +198,7 @@ export default function App() {
   };
 
   if (loadingAuth) {
-    return <div className="min-h-screen bg-stone-50 flex items-center justify-center font-bold text-red-600">Cargando plataforma...</div>;
+    return <div className="min-h-screen bg-stone-50 flex items-center justify-center font-bold text-red-600 w-full">Cargando plataforma...</div>;
   }
 
   if (view === 'login' || view === 'register') {
@@ -198,7 +206,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-stone-50 flex flex-col font-sans overflow-x-hidden w-full">
       <Navbar 
         user={currentUser} 
         onLogout={handleLogout} 
@@ -212,9 +220,10 @@ export default function App() {
         isSearchExpanded={isSearchExpanded}
         setIsSearchExpanded={setIsSearchExpanded}
       />
-      <main className="flex-grow container mx-auto px-4 py-8 relative">
+      {/* Ccontenedor Expandido - Removido container mx-auto para que cubra toda la pantalla */}
+      <main className="flex-grow w-full max-w-[2000px] mx-auto px-4 md:px-8 py-8 relative">
         {currentUser?.role === 'admin' ? (
-          <AdminDashboard products={products} categories={categories} orders={orders} expenses={expenses} coupons={coupons} bcvRate={bcvRate} clients={clients} promotions={promotions} />
+          <AdminDashboard products={products} categories={categories} orders={orders} expenses={expenses} coupons={coupons} bcvRate={bcvRate} clients={clients} promotions={promotions} loyaltySettings={loyaltySettings} />
         ) : (
           <ClientStorefront 
             products={products} 
@@ -225,6 +234,7 @@ export default function App() {
             bcvRate={bcvRate}
             searchQuery={searchQuery}
             coupons={coupons}
+            loyaltySettings={loyaltySettings}
           />
         )}
       </main>
@@ -266,7 +276,7 @@ function AuthScreen({ view, setView }) {
   const handleChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
+    <div className="min-h-screen w-full bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden relative">
         <div className="bg-white p-6 text-center border-b border-stone-100 flex flex-col items-center">
           <img src="/logo.png" alt="Decomer Frutas" className="h-32 w-auto object-contain" />
@@ -331,8 +341,8 @@ function AuthScreen({ view, setView }) {
 
 function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onLoginClick, searchQuery, setSearchQuery, isSearchExpanded, setIsSearchExpanded }) {
   return (
-    <nav className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 print:hidden transition-all">
-      <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex justify-between items-center">
+    <nav className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 print:hidden transition-all w-full">
+      <div className="w-full max-w-[2000px] mx-auto px-4 md:px-8 py-3 sm:py-4 flex justify-between items-center">
         <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
           <img src="/logo.png" alt="Decomer Frutas" className="h-10 sm:h-14 w-auto drop-shadow-sm hover:scale-105 transition-transform" />
         </div>
@@ -401,8 +411,8 @@ function Navbar({ user, onLogout, cartCount, bcvRate, setBcvRate, onSaveBcv, onL
 
 function Footer() {
   return (
-    <footer className="bg-stone-900 text-stone-300 py-10 text-center mt-auto print:hidden">
-      <div className="container mx-auto px-4 flex flex-col items-center justify-center gap-6">
+    <footer className="bg-stone-900 text-stone-300 py-10 text-center mt-auto print:hidden w-full">
+      <div className="w-full max-w-[2000px] mx-auto px-4 flex flex-col items-center justify-center gap-6">
         <div className="space-y-2">
           <p className="font-serif text-3xl text-white font-bold tracking-wide">Decomer Frutas</p>
           <p className="text-sm max-w-md text-stone-400 mx-auto">Especialistas en arreglos frutales, fresas con chocolate y desayunos sorpresa. ¡Endulzamos tus mejores momentos!</p>
@@ -422,12 +432,12 @@ function Footer() {
 }
 
 // --- ADMIN COMPONENTS ---
-function AdminDashboard({ products, categories, orders, expenses, coupons, systemUsers, bcvRate, clients, promotions }) {
+function AdminDashboard({ products, categories, orders, expenses, coupons, bcvRate, clients, promotions, loyaltySettings }) {
   const [activeTab, setActiveTab] = useState('orders');
 
   return (
-    <div className="animate-fade-in flex flex-col md:flex-row gap-6">
-      <div className="w-full md:w-64 shrink-0 print:hidden">
+    <div className="animate-fade-in flex flex-col xl:flex-row gap-6 w-full">
+      <div className="w-full xl:w-64 shrink-0 print:hidden">
         <div className="bg-white rounded-3xl shadow-sm border border-stone-200 p-5 sticky top-24">
           <div className="flex items-center gap-3 mb-6 px-2">
             <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600"><Star className="w-5 h-5" /></div>
@@ -437,36 +447,36 @@ function AdminDashboard({ products, categories, orders, expenses, coupons, syste
             </div>
           </div>
           
-          <nav className="space-y-1.5">
-            <button onClick={() => setActiveTab('kpis')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'kpis' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingUp className="w-5 h-5" /> Dashboard</button>
-            <button onClick={() => setActiveTab('expenses')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'expenses' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingDown className="w-5 h-5" /> Gastos y Egresos</button>
-            <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'orders' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}>
+          <nav className="flex flex-row xl:flex-col gap-2 overflow-x-auto xl:overflow-visible no-scrollbar pb-2 xl:pb-0">
+            <button onClick={() => setActiveTab('kpis')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'kpis' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingUp className="w-5 h-5" /> <span className="hidden sm:inline">Dashboard</span></button>
+            <button onClick={() => setActiveTab('expenses')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'expenses' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingDown className="w-5 h-5" /> <span className="hidden sm:inline">Gastos y Egresos</span></button>
+            <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'orders' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}>
               <ShoppingBag className="w-5 h-5" /> Pedidos 
               {orders.filter((o)=>o.status==='Pendiente').length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{orders.filter((o)=>o.status==='Pendiente').length}</span>}
             </button>
             
-            <button onClick={() => setActiveTab('delivery')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> Rutas de Entrega</button>
+            <button onClick={() => setActiveTab('delivery')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Map className="w-5 h-5" /> <span className="hidden sm:inline">Rutas de Entrega</span></button>
             
-            <div className="pt-4 mt-4 border-t border-stone-100"></div>
+            <div className="hidden xl:block pt-4 mt-4 border-t border-stone-100"></div>
 
-            <button onClick={() => setActiveTab('clients')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'clients' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
-            <button onClick={() => setActiveTab('promos')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'promos' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Zap className="w-5 h-5" /> Promociones</button>
-            <button onClick={() => setActiveTab('coupons')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'coupons' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Ticket className="w-5 h-5" /> Cupones</button>
+            <button onClick={() => setActiveTab('clients')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'clients' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
+            <button onClick={() => setActiveTab('promos')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'promos' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Zap className="w-5 h-5" /> Promociones</button>
+            <button onClick={() => setActiveTab('coupons')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'coupons' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Ticket className="w-5 h-5" /> Cupones</button>
 
-            <div className="pt-4 mt-4 border-t border-stone-100"></div>
+            <div className="hidden xl:block pt-4 mt-4 border-t border-stone-100"></div>
             
-            <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
-            <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
+            <button onClick={() => setActiveTab('products')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
+            <button onClick={() => setActiveTab('categories')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm shrink-0 xl:w-full ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
           </nav>
         </div>
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 w-full">
         {activeTab === 'kpis' && <AdminKPIs orders={orders} expenses={expenses} bcvRate={bcvRate} />}
         {activeTab === 'expenses' && <AdminExpenses expenses={expenses} bcvRate={bcvRate} />}
-        {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
+        {activeTab === 'orders' && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} loyaltySettings={loyaltySettings} />}
         {activeTab === 'delivery' && <AdminDeliveryRoute orders={orders} bcvRate={bcvRate} />}
-        {activeTab === 'clients' && <AdminClients clients={clients} promotions={promotions} products={products} />}
+        {activeTab === 'clients' && <AdminClients clients={clients} promotions={promotions} products={products} loyaltySettings={loyaltySettings} />}
         {activeTab === 'promos' && <AdminPromos promotions={promotions} products={products} />}
         {activeTab === 'coupons' && <AdminCoupons coupons={coupons} />}
         {activeTab === 'products' && <AdminProducts products={products} categories={categories} />}
@@ -494,7 +504,7 @@ function AdminExpenses({ expenses, bcvRate }) {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-4xl">
+    <div className="space-y-6 animate-fade-in w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><TrendingDown className="w-6 h-6 text-orange-600"/> Control de Gastos</h2>
         <p className="text-stone-500">Registra tus compras de material, delivery e insumos</p>
@@ -508,7 +518,7 @@ function AdminExpenses({ expenses, bcvRate }) {
           <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md shrink-0">Agregar Gasto</button>
         </form>
 
-        <div className="overflow-x-auto rounded-2xl border border-stone-100">
+        <div className="overflow-x-auto rounded-2xl border border-stone-100 w-full">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
@@ -562,7 +572,7 @@ function AdminCoupons({ coupons }) {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-4xl">
+    <div className="space-y-6 animate-fade-in w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Ticket className="w-6 h-6 text-pink-500"/> Cupones de Descuento</h2>
         <p className="text-stone-500">Crea códigos promocionales para tus clientes</p>
@@ -579,7 +589,7 @@ function AdminCoupons({ coupons }) {
           <button type="submit" className="bg-stone-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md shrink-0">Crear Cupón</button>
         </form>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {coupons.map((c) => (
             <div key={c.id} className={`p-5 rounded-2xl border ${c.active ? 'border-pink-200 bg-pink-50' : 'border-stone-200 bg-stone-50 opacity-60'} flex flex-col relative`}>
               <div className="flex justify-between items-start mb-2">
@@ -600,15 +610,18 @@ function AdminCoupons({ coupons }) {
   );
 }
 
-
-// --- MÓDULO MIS CLIENTES (ACTUALIZADO CON PUNTOS) ---
-function AdminClients({ clients, promotions, products }) {
+// --- MÓDULO MIS CLIENTES (FIDELIDAD Y CONFIGURACIÓN) ---
+function AdminClients({ clients, promotions, products, loyaltySettings }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClients, setSelectedClients] = useState([]);
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const [selectedPromoId, setSelectedPromoId] = useState('');
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // Settings Puntos
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [localSettings, setLocalSettings] = useState(loyaltySettings);
 
   const filteredClients = clients.filter(c => 
     (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -623,6 +636,14 @@ function AdminClients({ clients, promotions, products }) {
   const toggleSelectClient = (id) => {
     if (selectedClients.includes(id)) setSelectedClients(selectedClients.filter(cId => cId !== id));
     else setSelectedClients([...selectedClients, id]);
+  };
+
+  const handleSaveSettings = async () => {
+    await setDoc(doc(db, 'settings', 'loyalty'), {
+      enabled: localSettings.enabled,
+      pointsPerDollar: Number(localSettings.pointsPerDollar) || 1
+    }, { merge: true });
+    setIsSettingsOpen(false);
   };
 
   const getPromoText = (promoId) => {
@@ -658,17 +679,22 @@ function AdminClients({ clients, promotions, products }) {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Users className="w-6 h-6 text-blue-600"/> Mis Clientes</h2>
           <p className="text-stone-500">Cartera de clientes, puntos acumulados y marketing</p>
         </div>
-        {selectedClients.length > 0 && (
-          <button onClick={() => setIsPromoModalOpen(true)} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg text-sm animate-fade-in">
-            <Send className="w-4 h-4" /> Enviar Promo a {selectedClients.length}
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button onClick={() => { setLocalSettings(loyaltySettings); setIsSettingsOpen(true); }} className="bg-stone-200 hover:bg-stone-300 text-stone-700 px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold transition-all text-sm shrink-0">
+            <Settings className="w-4 h-4" /> Configurar Puntos
           </button>
-        )}
+          {selectedClients.length > 0 && (
+            <button onClick={() => setIsPromoModalOpen(true)} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-lg text-sm flex-1 sm:flex-none animate-fade-in">
+              <Send className="w-4 h-4" /> Enviar Promo a {selectedClients.length}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="relative w-full md:w-96">
@@ -676,7 +702,7 @@ function AdminClients({ clients, promotions, products }) {
         <input type="text" placeholder="Buscar cliente por nombre o teléfono..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white border border-stone-200 rounded-2xl outline-none focus:border-blue-500 text-sm shadow-sm transition-colors"/>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden w-full">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -686,7 +712,7 @@ function AdminClients({ clients, promotions, products }) {
                 <th className="p-4 font-bold">Teléfono</th>
                 <th className="p-4 font-bold text-center">Nº Pedidos</th>
                 <th className="p-4 font-bold text-center">Puntos Decomer</th>
-                <th className="p-4 font-bold text-center">Chat</th>
+                <th className="p-4 font-bold text-center min-w-[100px]">Chat</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -695,12 +721,12 @@ function AdminClients({ clients, promotions, products }) {
                   <td className="p-4 text-center"><input type="checkbox" checked={selectedClients.includes(client.id)} onChange={() => toggleSelectClient(client.id)} className="w-4 h-4 rounded text-blue-600" /></td>
                   <td className="p-4">
                     <span className="font-bold text-gray-900 block">{client.name || 'Sin Nombre'}</span>
-                    <span className="text-xs text-stone-500 truncate max-w-[200px] block" title={client.address}>{client.address || 'Sin dirección guardada'}</span>
+                    <span className="text-xs text-stone-500 truncate max-w-[250px] block" title={client.address}>{client.address || 'Sin dirección guardada'}</span>
                   </td>
                   <td className="p-4 font-medium text-stone-700">{client.phone}</td>
                   <td className="p-4 text-center"><span className="bg-blue-50 text-blue-700 font-black px-3 py-1 rounded-full text-xs">{client.totalOrders || 1}</span></td>
                   <td className="p-4 text-center">
-                    <span className="flex items-center justify-center gap-1 font-black text-pink-600 bg-pink-50 px-3 py-1 rounded-full text-xs border border-pink-100 w-max mx-auto">
+                    <span className={`flex items-center justify-center gap-1 font-black px-3 py-1 rounded-full text-xs border w-max mx-auto ${loyaltySettings.enabled ? 'text-pink-600 bg-pink-50 border-pink-100' : 'text-stone-400 bg-stone-50 border-stone-200'}`}>
                       <Award className="w-3 h-3"/> {client.points ? Math.floor(client.points) : 0} pts
                     </span>
                   </td>
@@ -715,7 +741,42 @@ function AdminClients({ clients, promotions, products }) {
         </div>
       </div>
 
-      {/* MODALS de Envio (Mantenidos igual que la versión anterior) */}
+      {/* Modal Settings Puntos */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Award className="w-5 h-5 text-pink-500"/> Puntos de Fidelidad</h3>
+              <button onClick={() => setIsSettingsOpen(false)} className="bg-white text-stone-400 hover:text-gray-800 p-1 rounded-full shadow-sm"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <label className="font-bold text-gray-800 text-sm">Sistema de Puntos</label>
+                  <p className="text-xs text-stone-500">¿Activar acumulación?</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input type="checkbox" checked={localSettings.enabled} onChange={e => setLocalSettings({...localSettings, enabled: e.target.checked})} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-500"></div>
+                </label>
+              </div>
+
+              <div className={`transition-opacity ${!localSettings.enabled && 'opacity-50 pointer-events-none'}`}>
+                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Puntos ganados por cada $1</label>
+                <div className="flex items-center gap-3">
+                  <input type="number" min="0.1" step="0.1" value={localSettings.pointsPerDollar} onChange={e => setLocalSettings({...localSettings, pointsPerDollar: e.target.value})} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none text-sm bg-stone-50 font-black text-pink-600 focus:border-pink-500" />
+                  <span className="text-sm font-bold text-stone-500">Pts</span>
+                </div>
+                <p className="text-[10px] text-stone-400 mt-2">Ej: Si configuras "1", una compra de $25 sumará 25 puntos.</p>
+              </div>
+
+              <button onClick={handleSaveSettings} className="w-full mt-6 bg-stone-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg transition-all">Guardar Configuración</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALS de Envio Masivo */}
       {isPromoModalOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
@@ -805,7 +866,7 @@ function AdminPromos({ promotions, products }) {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Zap className="w-6 h-6 text-yellow-500"/> Promociones</h2>
@@ -836,7 +897,7 @@ function AdminPromos({ promotions, products }) {
 
             <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200">
               <label className="block text-xs font-bold text-gray-700 mb-3 uppercase flex items-center gap-2"><Tag className="w-4 h-4"/> Adjuntar Productos (Opcional)</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-1">
                 {products.map(p => (
                   <label key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${currentPromo.selectedProductIds.includes(p.id) ? 'bg-white border-green-500 shadow-sm' : 'bg-white border-stone-200 opacity-70 hover:opacity-100'}`}>
                     <input type="checkbox" checked={currentPromo.selectedProductIds.includes(p.id)} onChange={() => handleToggleProduct(p.id)} className="w-4 h-4 text-green-600 rounded" />
@@ -856,7 +917,7 @@ function AdminPromos({ promotions, products }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {promotions.map((promo) => (
           <div key={promo.id} className="bg-white rounded-3xl shadow-sm border border-stone-200 p-5 flex flex-col hover:shadow-md transition-shadow relative overflow-hidden group">
             <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400"></div>
@@ -902,8 +963,9 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
 
   const filteredOrders = orders.filter(o => {
     if (o.status === 'Cancelado') return false; 
+    if (o.deliveryMethod === 'pickup') return false; // Solo Delivery
     
-    // Extracción segura de la fecha blindada
+    // Extracción segura de la fecha
     let orderDate = o.deliveryDate || '';
     if (!orderDate && o.date) {
       try {
@@ -985,14 +1047,14 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Map className="w-6 h-6 text-red-600"/> Constructor de Rutas</h2>
-        <p className="text-stone-500">Selecciona los pedidos y arma la ruta específica para un motorizado.</p>
+        <p className="text-stone-500">Selecciona los pedidos (Delivery) y arma la ruta específica para un motorizado.</p>
       </div>
 
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 items-end">
-        <div className="flex flex-col md:flex-row gap-4 w-full">
+      <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 items-end w-full">
+        <div className="flex flex-col md:flex-row gap-4 w-full xl:w-2/3">
           <div className="flex-1">
             <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">1. Selecciona la Fecha</label>
             <input 
@@ -1019,7 +1081,7 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
         <div className="bg-white rounded-3xl shadow-sm border border-stone-200 flex flex-col max-h-[800px]">
           <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center rounded-t-3xl shrink-0">
             <div>
@@ -1031,7 +1093,7 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
             {availableOrders.length === 0 ? (
               <div className="p-10 text-center text-stone-400">
                 <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p className="font-medium text-sm">No hay pedidos pendientes para este filtro.</p>
+                <p className="font-medium text-sm">No hay pedidos pendientes de Delivery para este filtro.</p>
               </div>
             ) : (
               availableOrders.map(order => {
@@ -1174,7 +1236,7 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
   );
 }
 
-// --- MÓDULO DASHBOARD / KPIs (ACTUALIZADO CON GASTOS Y GANANCIAS) ---
+// --- MÓDULO DASHBOARD / KPIs ---
 function AdminKPIs({ orders, expenses, bcvRate }) {
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -1219,13 +1281,13 @@ function AdminKPIs({ orders, expenses, bcvRate }) {
   const enPrep = orders.filter((o) => o.status === 'En Preparación').length;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Métricas del Negocio</h2>
         <p className="text-stone-500">Analiza el rendimiento y tus ganancias reales</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* VENTAS */}
         <div className="bg-gradient-to-br from-stone-900 to-stone-800 p-6 rounded-3xl shadow-lg text-white relative overflow-hidden">
           <div className="relative z-10">
@@ -1252,7 +1314,7 @@ function AdminKPIs({ orders, expenses, bcvRate }) {
         </div>
 
         {/* GANANCIA NETA */}
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 p-6 rounded-3xl shadow-sm relative overflow-hidden">
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 p-6 rounded-3xl shadow-sm relative overflow-hidden md:col-span-2 xl:col-span-1">
           <div className="relative z-10">
             <p className="text-green-800 text-sm font-bold flex items-center gap-2 mb-1"><Award className="w-4 h-4"/> Ganancia Neta (Mes)</p>
             <p className={`text-4xl font-black ${monthNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>${monthNetProfit.toFixed(2)}</p>
@@ -1306,8 +1368,8 @@ function AdminKPIs({ orders, expenses, bcvRate }) {
   );
 }
 
-// --- MÓDULO CONTROL DE PEDIDOS (ACTUALIZADO CON ETIQUETAS) ---
-function AdminOrders({ orders, bcvRate, products }) {
+// --- MÓDULO CONTROL DE PEDIDOS ---
+function AdminOrders({ orders, bcvRate, products, loyaltySettings }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
 
@@ -1320,14 +1382,14 @@ function AdminOrders({ orders, bcvRate, products }) {
   
   const [viewPaymentsModal, setViewPaymentsModal] = useState({ isOpen: false, orderId: null });
   const [receiptModal, setReceiptModal] = useState({ isOpen: false, order: null });
-  const [stickerModal, setStickerModal] = useState({ isOpen: false, order: null }); // NUEVO: Modal Sticker
+  const [stickerModal, setStickerModal] = useState({ isOpen: false, order: null });
 
   // Modal Pedido Manual / Edición
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [editOrderId, setEditOrderId] = useState(null);
   const [manualOrder, setManualOrder] = useState({ 
     senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', 
-    deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] 
+    deliveryMethod: 'delivery', deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] 
   });
   const [manualProduct, setManualProduct] = useState('');
   const [manualQty, setManualQty] = useState(1);
@@ -1392,7 +1454,7 @@ function AdminOrders({ orders, bcvRate, products }) {
 
   const openCreateModal = () => {
     setEditOrderId(null);
-    setManualOrder({ senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] });
+    setManualOrder({ senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', deliveryMethod: 'delivery', deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] });
     setIsOrderModalOpen(true);
   };
 
@@ -1403,6 +1465,7 @@ function AdminOrders({ orders, bcvRate, products }) {
       senderPhone: order.senderPhone || order.phone || '',
       recipientName: order.recipientName || '',
       recipientPhone: order.recipientPhone || '',
+      deliveryMethod: order.deliveryMethod || 'delivery',
       deliveryAddress: order.deliveryAddress || order.address || '',
       deliveryDate: order.deliveryDate || '',
       deliveryTimeSlot: order.deliveryTimeSlot || 'Mañana (8:00 AM - 12:00 PM)',
@@ -1442,20 +1505,23 @@ function AdminOrders({ orders, bcvRate, products }) {
     if (manualOrder.items.length === 0) return alert("Debes agregar al menos un producto.");
     const totalUSD = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
     
+    const earnedPoints = loyaltySettings.enabled ? Math.floor(totalUSD * (Number(loyaltySettings.pointsPerDollar) || 1)) : 0;
+
     const orderData = {
       senderName: manualOrder.senderName,
       senderPhone: manualOrder.senderPhone,
       recipientName: manualOrder.recipientName,
       recipientPhone: manualOrder.recipientPhone,
-      deliveryAddress: manualOrder.deliveryAddress,
+      deliveryMethod: manualOrder.deliveryMethod,
+      deliveryAddress: manualOrder.deliveryMethod === 'pickup' ? 'RETIRO EN TIENDA' : manualOrder.deliveryAddress,
       deliveryDate: manualOrder.deliveryDate,
       deliveryTimeSlot: manualOrder.deliveryTimeSlot,
       dedication: manualOrder.dedication,
       items: manualOrder.items,
       totalUSD: totalUSD,
-      customerName: manualOrder.senderName,
-      phone: manualOrder.senderPhone,
-      address: manualOrder.deliveryAddress
+      customerName: manualOrder.senderName, // Legacy fallback
+      phone: manualOrder.senderPhone, // Legacy fallback
+      address: manualOrder.deliveryMethod === 'pickup' ? 'RETIRO EN TIENDA' : manualOrder.deliveryAddress
     };
 
     if (editOrderId) {
@@ -1486,17 +1552,17 @@ function AdminOrders({ orders, bcvRate, products }) {
       if (clientSnap.exists()) {
         await updateDoc(clientRef, { 
           totalOrders: (clientSnap.data().totalOrders || 0) + (editOrderId ? 0 : 1), 
-          points: (clientSnap.data().points || 0) + (!editOrderId ? Math.floor(totalUSD) : 0),
+          points: (clientSnap.data().points || 0) + (!editOrderId ? earnedPoints : 0),
           name: manualOrder.senderName || clientSnap.data().name, 
-          address: manualOrder.deliveryAddress || clientSnap.data().address 
+          address: (manualOrder.deliveryMethod === 'delivery' ? manualOrder.deliveryAddress : clientSnap.data().address) || '' 
         });
       } else {
         await setDoc(clientRef, { 
           name: manualOrder.senderName || 'Sin Nombre', 
           phone: manualOrder.senderPhone, 
-          address: manualOrder.deliveryAddress || '', 
+          address: manualOrder.deliveryMethod === 'delivery' ? manualOrder.deliveryAddress : '', 
           totalOrders: 1, 
-          points: Math.floor(totalUSD),
+          points: earnedPoints,
           dateAdded: new Date().toISOString() 
         });
       }
@@ -1524,18 +1590,18 @@ function AdminOrders({ orders, bcvRate, products }) {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Control de Pedidos</h2>
           <p className="text-stone-500">Gestiona entregas y cobros</p>
         </div>
-        <button onClick={openCreateModal} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg hover:shadow-xl text-sm">
+        <button onClick={openCreateModal} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-lg hover:shadow-xl text-sm w-full sm:w-auto">
           <Plus className="w-5 h-5" /> Nuevo Pedido Manual
         </button>
       </div>
 
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-center print:hidden">
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-center print:hidden w-full">
         <div className="flex bg-stone-100 p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar">
           {['Todos', 'Pendiente', 'Pagado', 'En Preparación', 'Completado'].map(status => (
             <button 
@@ -1560,7 +1626,7 @@ function AdminOrders({ orders, bcvRate, products }) {
         </div>
       </div>
       
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-x-auto print:hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-x-auto print:hidden w-full">
         <table className="w-full text-left border-collapse whitespace-nowrap">
           <thead>
             <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
@@ -1568,7 +1634,7 @@ function AdminOrders({ orders, bcvRate, products }) {
               <th className="p-4 font-bold">Detalles del Cliente</th>
               <th className="p-4 font-bold">Monto</th>
               <th className="p-4 font-bold">Estado del Pago</th>
-              <th className="p-4 font-bold text-center">Acciones</th>
+              <th className="p-4 font-bold text-center min-w-[280px]">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
@@ -1593,7 +1659,10 @@ function AdminOrders({ orders, bcvRate, products }) {
               return (
               <tr key={order.id} className="hover:bg-stone-50/50 transition-colors">
                 <td className="p-4">
-                  <div className="font-black text-gray-900">{order.displayId || 'PED-WEB'}</div>
+                  <div className="font-black text-gray-900 flex items-center gap-2">
+                    {order.displayId || 'PED-WEB'}
+                    {order.deliveryMethod === 'pickup' && <span title="Retiro en Tienda" className="bg-blue-100 text-blue-700 p-1 rounded"><MapPin className="w-3 h-3"/></span>}
+                  </div>
                   <div className="text-xs text-stone-500 font-medium">{dateStr}</div>
                 </td>
                 <td className="p-4 text-sm text-gray-700">
@@ -1620,29 +1689,29 @@ function AdminOrders({ orders, bcvRate, products }) {
                     </button>
                   )}
                 </td>
-                <td className="p-4 flex items-center justify-center gap-2">
+                <td className="p-4 flex items-center justify-end gap-2 flex-nowrap min-w-[max-content]">
                   <select 
                     value={order.status}
                     onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                    className={`text-xs font-black uppercase tracking-wider px-3 py-2 rounded-xl border-0 outline-none cursor-pointer shadow-sm ${getStatusColor(order.status)}`}
+                    className={`text-xs font-black uppercase tracking-wider px-2 py-2 rounded-xl border-0 outline-none cursor-pointer shadow-sm ${getStatusColor(order.status)}`}
                   >
                     <option value="Pendiente">Pendiente</option>
                     <option value="Abonado">Abonado</option>
                     <option value="Pagado">Pagado</option>
-                    <option value="En Preparación">En Preparación</option>
-                    <option value="Completado">Completado</option>
+                    <option value="En Preparación">En Prep.</option>
+                    <option value="Completado">✓ Entregado</option>
                     <option value="Cancelado">Cancelado</option>
                   </select>
                   
-                  <button onClick={() => openEditModal(order)} className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors shadow-sm" title="Editar Pedido">
+                  <button onClick={() => openEditModal(order)} className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors shadow-sm shrink-0" title="Editar Pedido">
                     <Edit className="w-5 h-5" />
                   </button>
 
-                  <button onClick={() => setStickerModal({ isOpen: true, order })} className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl transition-colors shadow-sm" title="Imprimir Sticker">
+                  <button onClick={() => setStickerModal({ isOpen: true, order })} className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl transition-colors shadow-sm shrink-0" title="Imprimir Sticker">
                     <ScanBarcode className="w-5 h-5" />
                   </button>
 
-                  <button onClick={() => setReceiptModal({ isOpen: true, order })} className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors shadow-sm" title="Imprimir Nota">
+                  <button onClick={() => setReceiptModal({ isOpen: true, order })} className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors shadow-sm shrink-0" title="Imprimir Nota Completa">
                     <Printer className="w-5 h-5" />
                   </button>
                 </td>
@@ -1677,7 +1746,11 @@ function AdminOrders({ orders, bcvRate, products }) {
                <div className="mb-3 space-y-1">
                  <p><b>Para:</b> {stickerModal.order.recipientName}</p>
                  <p><b>Tlf:</b> {stickerModal.order.recipientPhone}</p>
-                 <p className="mt-2"><b>Dir:</b> {stickerModal.order.deliveryAddress}</p>
+                 {stickerModal.order.deliveryMethod === 'pickup' ? (
+                   <p className="mt-2 text-center border border-black p-1 font-bold">RETIRO EN TIENDA</p>
+                 ) : (
+                   <p className="mt-2"><b>Dir:</b> {stickerModal.order.deliveryAddress}</p>
+                 )}
                  {stickerModal.order.deliveryDate && <p className="mt-1"><b>Fecha:</b> {stickerModal.order.deliveryDate}</p>}
                </div>
                <div className="border-t border-b border-dashed border-black py-2 mb-3">
@@ -1736,7 +1809,11 @@ function AdminOrders({ orders, bcvRate, products }) {
                     <p className="text-xs text-stone-500">{receiptModal.order.recipientPhone}</p>
                   </div>
                 </div>
-                <p className="text-sm text-gray-800"><strong className="text-gray-500">Dirección:</strong> {receiptModal.order.deliveryAddress || receiptModal.order.address}</p>
+                {receiptModal.order.deliveryMethod === 'pickup' ? (
+                  <p className="text-sm text-gray-800 font-bold bg-blue-50 p-2 text-center rounded border border-blue-200 mt-2">RETIRO EN TIENDA</p>
+                ) : (
+                  <p className="text-sm text-gray-800"><strong className="text-gray-500">Dirección:</strong> {receiptModal.order.deliveryAddress || receiptModal.order.address}</p>
+                )}
                 <p className="text-sm text-gray-800"><strong className="text-gray-500">Fecha/Hora:</strong> {receiptModal.order.deliveryDate} - {receiptModal.order.deliveryTimeSlot}</p>
               </div>
 
@@ -2004,12 +2081,20 @@ function AdminOrders({ orders, bcvRate, products }) {
 
                 {/* 3. Entrega */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-stone-700 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
-                  <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={manualOrder.deliveryAddress} onChange={e => setManualOrder({...manualOrder, deliveryAddress: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 resize-none" />
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-stone-700 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Método y Detalles de Entrega</h4>
+                  
+                  <div className="flex gap-2 mb-2">
+                     <button type="button" onClick={() => setManualOrder({...manualOrder, deliveryMethod: 'delivery'})} className={`flex-1 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border text-sm transition-colors ${manualOrder.deliveryMethod === 'delivery' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-stone-200 text-stone-500'}`}><Truck className="w-4 h-4"/> Delivery</button>
+                     <button type="button" onClick={() => setManualOrder({...manualOrder, deliveryMethod: 'pickup'})} className={`flex-1 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border text-sm transition-colors ${manualOrder.deliveryMethod === 'pickup' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-stone-200 text-stone-500'}`}><MapPin className="w-4 h-4"/> Retiro en Tienda</button>
+                  </div>
+
+                  {manualOrder.deliveryMethod === 'delivery' && (
+                    <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={manualOrder.deliveryAddress} onChange={e => setManualOrder({...manualOrder, deliveryAddress: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 resize-none" />
+                  )}
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">Fecha de Entrega</label>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">{manualOrder.deliveryMethod === 'pickup' ? 'Fecha de Retiro' : 'Fecha de Entrega'}</label>
                       <input required type="date" value={manualOrder.deliveryDate} onChange={e => setManualOrder({...manualOrder, deliveryDate: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-stone-50 text-stone-700" />
                     </div>
                     <div>
@@ -2068,7 +2153,7 @@ function AdminOrders({ orders, bcvRate, products }) {
   );
 }
 
-// --- MÓDULO DE PRODUCTOS (ACTUALIZADO CON STOCK) ---
+// --- MÓDULO DE PRODUCTOS ---
 function AdminProducts({ products, categories }) {
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -2129,7 +2214,7 @@ function AdminProducts({ products, categories }) {
   const filteredProducts = products.filter((p) => String(p.name).toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Catálogo de Productos y Extras</h2>
@@ -2246,7 +2331,7 @@ function AdminProducts({ products, categories }) {
         />
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden w-full">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -2316,7 +2401,7 @@ function AdminCategories({ categories }) {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl animate-fade-in">
+    <div className="space-y-6 max-w-2xl animate-fade-in w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-800">Categorías de Menú</h2>
         <p className="text-stone-500">Organiza cómo los clientes ven tus arreglos</p>
@@ -2343,7 +2428,7 @@ function AdminCategories({ categories }) {
 }
 
 // --- CLIENT COMPONENTS (Storefront) ---
-function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, searchQuery, coupons }) {
+function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, searchQuery, coupons, loyaltySettings }) {
   const [checkoutStep, setCheckoutStep] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
@@ -2364,6 +2449,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     senderPhone: user?.phone || '', 
     recipientName: '', 
     recipientPhone: '', 
+    deliveryMethod: 'delivery', // 'delivery' o 'pickup'
     deliveryAddress: user?.address || '', 
     deliveryDate: '', 
     deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', 
@@ -2454,9 +2540,12 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     const phone = "584125296272";
     const orderDisplayId = `PED-${Math.floor(Math.random() * 10000)}`;
     
+    const earnedPoints = loyaltySettings.enabled ? Math.floor(totalUSD * (Number(loyaltySettings.pointsPerDollar) || 1)) : 0;
+
     await addDoc(collection(db, 'orders'), {
       displayId: orderDisplayId,
       ...deliveryInfo,
+      deliveryAddress: deliveryInfo.deliveryMethod === 'pickup' ? 'RETIRO EN TIENDA' : deliveryInfo.deliveryAddress,
       items: cart,
       subtotalUSD: subtotalUSD,
       discountUSD: discountUSD,
@@ -2483,17 +2572,17 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
       if (clientSnap.exists()) {
         await updateDoc(clientRef, { 
           totalOrders: (clientSnap.data().totalOrders || 0) + 1, 
-          points: (clientSnap.data().points || 0) + Math.floor(totalUSD),
+          points: (clientSnap.data().points || 0) + earnedPoints,
           name: deliveryInfo.senderName || clientSnap.data().name, 
-          address: deliveryInfo.deliveryAddress || clientSnap.data().address 
+          address: (deliveryInfo.deliveryMethod === 'delivery' ? deliveryInfo.deliveryAddress : clientSnap.data().address) || '' 
         });
       } else {
         await setDoc(clientRef, { 
           name: deliveryInfo.senderName || 'Sin Nombre', 
           phone: deliveryInfo.senderPhone, 
-          address: deliveryInfo.deliveryAddress || '', 
+          address: deliveryInfo.deliveryMethod === 'delivery' ? deliveryInfo.deliveryAddress : '', 
           totalOrders: 1, 
-          points: Math.floor(totalUSD),
+          points: earnedPoints,
           dateAdded: new Date().toISOString() 
         });
       }
@@ -2506,10 +2595,17 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     text += `*📥 QUIEN RECIBE:*\n`;
     text += `▪️ Nombre: ${deliveryInfo.recipientName}\n`;
     text += `▪️ Teléfono: ${deliveryInfo.recipientPhone}\n\n`;
-    text += `*📍 DETALLES DE ENTREGA:*\n`;
-    text += `▪️ Dirección: ${deliveryInfo.deliveryAddress}\n`;
-    text += `▪️ Fecha: ${deliveryInfo.deliveryDate}\n`;
-    text += `▪️ Horario: ${deliveryInfo.deliveryTimeSlot}\n\n`;
+    
+    if (deliveryInfo.deliveryMethod === 'pickup') {
+      text += `*🛍️ MÉTODO DE ENTREGA: RETIRO EN TIENDA*\n`;
+      text += `▪️ Fecha de Retiro: ${deliveryInfo.deliveryDate}\n`;
+      text += `▪️ Horario: ${deliveryInfo.deliveryTimeSlot}\n\n`;
+    } else {
+      text += `*🚚 MÉTODO DE ENTREGA: DELIVERY*\n`;
+      text += `▪️ Dirección: ${deliveryInfo.deliveryAddress}\n`;
+      text += `▪️ Fecha: ${deliveryInfo.deliveryDate}\n`;
+      text += `▪️ Horario: ${deliveryInfo.deliveryTimeSlot}\n\n`;
+    }
     
     if(deliveryInfo.dedication) {
       text += `*📝 DEDICATORIA:*\n_"${deliveryInfo.dedication}"_\n\n`;
@@ -2536,7 +2632,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
        if (balanceUSD > 0) text += `*Saldo Restante:* $${balanceUSD.toFixed(2)}\n`;
        else text += `*Estado:* PAGADO COMPLETO ✅\n`;
     }
-    text += `\n⭐ *Has acumulado ${Math.floor(totalUSD)} Puntos Decomer con esta compra.*`;
+    
+    if (loyaltySettings.enabled) {
+      text += `\n⭐ *Has acumulado ${earnedPoints} Puntos Decomer con esta compra.*`;
+    }
 
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
     setCart([]); setClientPayments([]); setCheckoutStep(false); setAppliedCoupon(null); setCouponCode('');
@@ -2572,7 +2671,6 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
     let matchPrice = true;
     if (priceFilter === 'under20') matchPrice = Number(p.price) < 20;
     if (priceFilter === '20to40') matchPrice = Number(p.price) >= 20 && Number(p.price) <= 40;
-    if (priceFilter === 'premium') matchPrice = Number(p.price) > 40;
 
     return matchCategory && matchSearch && matchPrice;
   });
@@ -2584,7 +2682,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 xl:gap-8 animate-fade-in relative w-full">
+    <div className="flex flex-col xl:flex-row gap-6 xl:gap-8 animate-fade-in relative w-full">
       <a href="https://wa.me/584125296272" target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:bg-[#1ebd5a] transition-transform hover:scale-110 z-40 flex items-center justify-center print:hidden group">
         <MessageCircle className="w-7 h-7" />
       </a>
@@ -2594,7 +2692,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
         <span className="font-medium text-sm">Agregado al carrito</span>
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 w-full">
         <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-3xl p-8 sm:p-10 text-white mb-6 shadow-lg relative overflow-hidden flex flex-col sm:flex-row justify-between items-center sm:items-end gap-6">
           <div className="relative z-10 w-full sm:w-auto text-center sm:text-left">
             <h1 className="text-3xl sm:text-5xl font-black mb-3 font-serif drop-shadow-md">Regala dulzura y amor</h1>
@@ -2617,7 +2715,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
           </div>
           <div className="bg-white p-4 rounded-2xl flex items-center gap-4 shadow-sm border border-stone-100">
             <div className="bg-green-50 text-green-500 p-3 rounded-xl"><Truck className="w-6 h-6"/></div>
-            <div><p className="text-sm font-bold text-gray-800">3. ¡Entregamos!</p><p className="text-xs text-stone-500">Sorpresa garantizada</p></div>
+            <div><p className="text-sm font-bold text-gray-800">3. ¡Entregamos!</p><p className="text-xs text-stone-500">O retiras en tienda</p></div>
           </div>
         </div>
 
@@ -2628,23 +2726,22 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
               <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ${selectedCategory === cat.id ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-red-50'}`}>{cat.name}</button>
             ))}
           </div>
-          <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full min-w-0">
+          <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar w-full min-w-0 items-center">
             <button onClick={() => setPriceFilter('all')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${priceFilter === 'all' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>Cualquier Precio</button>
             <button onClick={() => setPriceFilter('under20')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'under20' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>Menos de $20</button>
             <button onClick={() => setPriceFilter('20to40')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === '20to40' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>$20 - $40</button>
-            <button onClick={() => setPriceFilter('premium')} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap ${priceFilter === 'premium' ? 'bg-stone-800 text-white' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>Premium</button>
             
             <div className="ml-auto flex items-center gap-2 pl-2 border-l border-stone-200 shrink-0">
               <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="bg-white border border-stone-200 text-stone-600 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-red-500 transition-colors shadow-sm cursor-pointer">
                 <option value="default">✨ Relevantes</option>
-                <option value="price-asc">📈 Menor a Mayor Precio</option>
-                <option value="price-desc">📉 Mayor a Menor Precio</option>
+                <option value="price-asc">📈 Menor Precio</option>
+                <option value="price-desc">📉 Mayor Precio</option>
               </select>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
           {filteredProducts.map((product) => {
             const isOutOfStock = product.stock !== '' && product.stock !== undefined && Number(product.stock) <= 0;
 
@@ -2694,9 +2791,9 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
         </div>
       </div>
 
-      <div id="cart-section" className="w-full lg:w-80 xl:w-[400px] shrink-0">
-        <div className="bg-white rounded-3xl shadow-xl border border-stone-100 sticky top-24 overflow-hidden flex flex-col max-h-[calc(100vh-8rem)]">
-          <div className="bg-stone-900 p-6 text-white flex items-center justify-between">
+      <div id="cart-section" className="w-full xl:w-[400px] shrink-0">
+        <div className="bg-white rounded-3xl shadow-xl border border-stone-100 sticky top-24 overflow-hidden flex flex-col xl:max-h-[calc(100vh-8rem)]">
+          <div className="bg-stone-900 p-6 text-white flex items-center justify-between shrink-0">
             <h3 className="text-lg font-bold flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Mi Pedido</h3>
             <span className="bg-stone-800 text-stone-300 text-xs font-bold px-2 py-1 rounded-md">{cart.reduce((a,c)=>a+c.quantity,0)} items</span>
           </div>
@@ -2765,7 +2862,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
           </div>
 
           {cart.length > 0 && (
-            <div className="p-6 bg-white border-t border-stone-100">
+            <div className="p-6 bg-white border-t border-stone-100 shrink-0">
               <div className="space-y-1 mb-4">
                 <div className="flex justify-between items-center text-sm text-stone-500">
                   <span>Subtotal</span>
@@ -2795,10 +2892,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
 
       {previewProduct && (
         <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
-          <div className="bg-white rounded-3xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row shadow-2xl relative">
+          <div className="bg-white rounded-3xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row shadow-2xl relative max-h-[90vh]">
             <button onClick={() => setPreviewProduct(null)} className="absolute top-4 right-4 z-10 bg-white/50 backdrop-blur hover:bg-white p-2 rounded-full text-stone-800 transition-colors"><X className="w-5 h-5"/></button>
             
-            <div className="w-full md:w-1/2 h-64 md:h-auto bg-stone-100 relative">
+            <div className="w-full md:w-1/2 h-64 md:h-auto bg-stone-100 relative shrink-0">
               <img src={previewProduct.image} className="w-full h-full object-cover" alt={previewProduct.name} />
               {previewProduct.badge && (
                 <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-yellow-100">
@@ -2807,7 +2904,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
               )}
             </div>
             
-            <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
+            <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white overflow-y-auto">
               <div className="mb-2 flex justify-between items-center">
                 <div className="text-xs font-bold text-red-500 uppercase tracking-widest">{categories.find((c)=>c.id === previewProduct.categoryId)?.name || 'Arreglo Especial'}</div>
                 {previewProduct.stock !== '' && previewProduct.stock !== undefined && (
@@ -2825,7 +2922,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                 <div className="text-sm font-bold text-stone-400 mt-1">Equivalente: Bs. {(Number(previewProduct.price) * bcvRate).toFixed(2)}</div>
               </div>
               
-              <div className="flex gap-3">
+              <div className="flex gap-3 mt-auto">
                 <button disabled={previewProduct.stock !== '' && previewProduct.stock !== undefined && Number(previewProduct.stock) <= 0} onClick={() => addToCart(previewProduct)} className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-stone-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-lg shadow-xl shadow-red-200 transition-transform hover:-translate-y-1">
                   <ShoppingCart className="w-5 h-5" /> {(previewProduct.stock !== '' && previewProduct.stock !== undefined && Number(previewProduct.stock) <= 0) ? 'No Disponible' : 'Agregar al Pedido'}
                 </button>
@@ -2839,7 +2936,7 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
       {checkoutStep && (
         <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-scale-in">
-            <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
+            <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center shrink-0">
               <div>
                 <h3 className="font-bold text-xl text-gray-800">Detalles de Entrega</h3>
                 <p className="text-xs text-stone-500 font-medium mt-1">Por favor completa todos los campos para tu pedido</p>
@@ -2867,12 +2964,22 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Detalles de la Entrega</h4>
-                  <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={deliveryInfo.deliveryAddress} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryAddress:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 resize-none"/>
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 uppercase tracking-wider"><MapPin className="w-4 h-4"/> 3. Método y Detalles de Entrega</h4>
+                  
+                  <div className="flex gap-2 mb-2">
+                     <button type="button" onClick={() => setDeliveryInfo({...deliveryInfo, deliveryMethod: 'delivery'})} className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 border text-sm transition-colors ${deliveryInfo.deliveryMethod === 'delivery' ? 'bg-red-50 border-red-500 text-red-600 shadow-sm' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}><Truck className="w-5 h-5"/> Delivery</button>
+                     <button type="button" onClick={() => setDeliveryInfo({...deliveryInfo, deliveryMethod: 'pickup'})} className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 border text-sm transition-colors ${deliveryInfo.deliveryMethod === 'pickup' ? 'bg-red-50 border-red-500 text-red-600 shadow-sm' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}><MapPin className="w-5 h-5"/> Retiro en Tienda</button>
+                  </div>
+
+                  {deliveryInfo.deliveryMethod === 'delivery' && (
+                    <div className="animate-fade-in">
+                       <textarea required placeholder="Dirección exacta de entrega (Punto de referencia, color de casa, etc.)" rows={2} value={deliveryInfo.deliveryAddress} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryAddress:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 resize-none"/>
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Fecha de Entrega</label>
+                      <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">{deliveryInfo.deliveryMethod === 'pickup' ? 'Fecha de Retiro' : 'Fecha de Entrega'}</label>
                       <input required type="date" value={deliveryInfo.deliveryDate} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryDate:e.target.value})} min={new Date().toISOString().split('T')[0]} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 text-stone-700"/>
                     </div>
                     <div>
@@ -2918,8 +3025,10 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                 </div>
               </form>
             </div>
-            <div className="p-6 border-t border-stone-100 bg-white">
-              <p className="text-center text-xs font-bold text-pink-600 mb-3"><Award className="w-3 h-3 inline relative -top-0.5"/> Sumarás {Math.floor(totalUSD)} Puntos Decomer al completar esta compra.</p>
+            <div className="p-6 border-t border-stone-100 bg-white shrink-0">
+              {loyaltySettings.enabled && (
+                <p className="text-center text-xs font-bold text-pink-600 mb-3"><Award className="w-3 h-3 inline relative -top-0.5"/> Sumarás {Math.floor(totalUSD * (Number(loyaltySettings.pointsPerDollar) || 1))} Puntos Decomer al completar esta compra.</p>
+              )}
               <button form="checkout-form" type="submit" className="w-full bg-[#25D366] hover:bg-[#1ebd5a] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-lg shadow-xl transition-all hover:-translate-y-1">
                 <Send className="w-5 h-5" /> Confirmar y Enviar Pedido
               </button>
@@ -2962,10 +3071,13 @@ function ClientStorefront({ products, categories, cart, setCart, user, bcvRate, 
                    <div className="flex justify-between items-center mb-4 pb-4 border-b border-stone-100">
                      <div>
                        <span className="text-xs font-bold text-stone-400 uppercase">Orden</span>
-                       <p className="text-xl font-black text-gray-900">{trackingModal.result.displayId}</p>
+                       <p className="text-xl font-black text-gray-900 flex items-center gap-1">
+                         {trackingModal.result.displayId}
+                         {trackingModal.result.deliveryMethod === 'pickup' && <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded"><MapPin className="w-3 h-3 inline"/></span>}
+                       </p>
                      </div>
                      <div className="text-right">
-                       <span className="text-[10px] font-bold text-stone-400 uppercase">Fecha</span>
+                       <span className="text-[10px] font-bold text-stone-400 uppercase">{trackingModal.result.deliveryMethod === 'pickup' ? 'Retiro' : 'Fecha'}</span>
                        <p className="text-sm font-bold text-gray-800">{trackingModal.result.deliveryDate || 'N/A'}</p>
                      </div>
                    </div>
