@@ -45,13 +45,12 @@ class ErrorBoundary extends React.Component {
       return (
         <div className="p-8 bg-red-50 text-red-600 rounded-3xl border border-red-200 mt-6 text-center shadow-sm w-full animate-fade-in">
           <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-red-500" />
-          <h2 className="font-bold text-2xl mb-2 text-red-800">Error en este módulo</h2>
-          <p className="text-sm font-medium mb-4 text-red-700">Se detectó un dato corrupto que impide mostrar esta sección.</p>
+          <h2 className="font-bold text-2xl mb-2 text-red-800">Carga Interrumpida</h2>
+          <p className="text-sm font-medium mb-4 text-red-700">Hay un dato corrupto que impide mostrar esta sección.</p>
           <div className="bg-white p-4 rounded-xl border border-red-100 text-xs font-mono text-left overflow-auto text-red-800 max-w-3xl mx-auto shadow-inner max-h-48">
             <p className="font-bold mb-2">{this.state.error && this.state.error.toString()}</p>
-            <pre className="whitespace-pre-wrap">{this.state.errorInfo && this.state.errorInfo.componentStack}</pre>
           </div>
-          <button onClick={() => this.setState({ hasError: false })} className="mt-6 bg-red-600 text-white px-6 py-2 rounded-xl font-bold shadow-md hover:bg-red-700 transition-colors">Reintentar</button>
+          <button onClick={() => window.location.reload()} className="mt-6 bg-red-600 text-white px-6 py-2 rounded-xl font-bold shadow-md hover:bg-red-700 transition-colors">Recargar Página</button>
         </div>
       );
     }
@@ -591,7 +590,7 @@ function AdminCustomers({ orders, systemUsers }) {
     };
 
     const safeNumber = (val) => { const num = Number(val); return isNaN(num) ? 0 : num; };
-    const clientMap = new Map();
+    const clientDict = {}; // CORRECCIÓN: Objeto plano para evitar colisión con Map nativo
 
     if (Array.isArray(systemUsers)) {
       systemUsers.forEach(u => {
@@ -599,7 +598,7 @@ function AdminCustomers({ orders, systemUsers }) {
           const phone = safeString(u.phone) || 'Sin Teléfono';
           const name = safeString(u.name) || 'Usuario Web';
           const key = phone !== 'Sin Teléfono' ? phone : name.toLowerCase();
-          clientMap.set(key, { name, phone, address: safeString(u.address), totalOrders: 0, totalSpent: 0, lastOrderTime: 0, isRegistered: true });
+          clientDict[key] = { name, phone, address: safeString(u.address), totalOrders: 0, totalSpent: 0, lastOrderTime: 0, isRegistered: true };
         }
       });
     }
@@ -620,25 +619,23 @@ function AdminCustomers({ orders, systemUsers }) {
 
         const key = phone !== 'Sin Teléfono' ? phone : name.toLowerCase();
 
-        if (!clientMap.has(key)) {
-          clientMap.set(key, { name, phone, address, totalOrders: 0, totalSpent: 0, lastOrderTime: 0, isRegistered: false });
+        if (!clientDict[key]) {
+          clientDict[key] = { name, phone, address, totalOrders: 0, totalSpent: 0, lastOrderTime: 0, isRegistered: false };
         }
 
-        const client = clientMap.get(key);
-        if (client) {
-          client.totalOrders += 1;
-          client.totalSpent += spent;
-          if (orderTime > client.lastOrderTime) {
-            client.lastOrderTime = orderTime;
-            if (!client.isRegistered && name !== 'Cliente Desconocido' && name !== 'Dato Formateado') {
-              client.name = name;
-            }
+        const client = clientDict[key];
+        client.totalOrders += 1;
+        client.totalSpent += spent;
+        if (orderTime > client.lastOrderTime) {
+          client.lastOrderTime = orderTime;
+          if (!client.isRegistered && name !== 'Cliente Desconocido' && name !== 'Dato Formateado') {
+            client.name = name;
           }
         }
       });
     }
 
-    const allCustomers = Array.from(clientMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+    const allCustomers = Object.values(clientDict).sort((a, b) => b.totalSpent - a.totalSpent);
     const sTerm = safeString(searchTerm).toLowerCase();
     if (!sTerm) return allCustomers;
 
@@ -1364,26 +1361,26 @@ function AdminKPIs({ orders, products, expenses, bcvRate }) {
         </div>
       </div>
 
-      {/* 🔴 TARJETAS DE RESUMEN (KPIs) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white border border-stone-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><TrendingUp className="w-32 h-32 text-blue-500"/></div>
-          <p className="text-stone-500 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Ingresos (Ventas)</p>
-          <p className="text-4xl font-black text-gray-900 relative z-10 mt-2">${monthSalesUSD.toFixed(2)}</p>
+      {/* 🔴 TARJETAS DE RESUMEN (KPIs) AJUSTADAS PARA NO DESBORDAR */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+        <div className="bg-white border border-stone-200 p-5 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow min-w-0">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><TrendingUp className="w-24 h-24 text-blue-500"/></div>
+          <p className="text-stone-500 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500 block"></span> Ingresos (Ventas)</p>
+          <p className="text-3xl lg:text-4xl font-black text-gray-900 relative z-10 mt-2 truncate" title={`$${monthSalesUSD.toFixed(2)}`}>${monthSalesUSD.toFixed(2)}</p>
           <p className="text-sm text-stone-500 mt-2 font-medium relative z-10 bg-stone-50 inline-block px-3 py-1 rounded-lg border border-stone-100">{monthOrders.length} pedidos pagados</p>
         </div>
         
-        <div className="bg-white border border-stone-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Receipt className="w-32 h-32 text-red-500"/></div>
-          <p className="text-stone-500 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500"></div> Egresos (Gastos)</p>
-          <p className="text-4xl font-black text-red-600 relative z-10 mt-2">-${monthExpensesUSD.toFixed(2)}</p>
+        <div className="bg-white border border-stone-200 p-5 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow min-w-0">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Receipt className="w-24 h-24 text-red-500"/></div>
+          <p className="text-stone-500 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 block"></span> Egresos (Gastos)</p>
+          <p className="text-3xl lg:text-4xl font-black text-red-600 relative z-10 mt-2 truncate" title={`-$${monthExpensesUSD.toFixed(2)}`}>-${monthExpensesUSD.toFixed(2)}</p>
           <p className="text-sm text-stone-500 mt-2 font-medium relative z-10 bg-stone-50 inline-block px-3 py-1 rounded-lg border border-stone-100">{monthExpensesList.length} registros</p>
         </div>
         
-        <div className="bg-stone-900 border border-stone-800 p-6 rounded-3xl shadow-xl text-white relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><DollarSign className="w-32 h-32 text-green-400"/></div>
-          <p className="text-stone-400 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-400"></div> Ganancia Neta Real</p>
-          <p className={`text-5xl font-black relative z-10 mt-2 ${netProfitUSD >= 0 ? 'text-white' : 'text-red-400'}`}>${netProfitUSD.toFixed(2)}</p>
+        <div className="bg-stone-900 border border-stone-800 p-5 rounded-3xl shadow-xl text-white relative overflow-hidden group min-w-0">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><DollarSign className="w-24 h-24 text-green-400"/></div>
+          <p className="text-stone-400 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-400 block"></span> Ganancia Neta Real</p>
+          <p className={`text-4xl lg:text-5xl font-black relative z-10 mt-2 truncate ${netProfitUSD >= 0 ? 'text-white' : 'text-red-400'}`} title={`$${netProfitUSD.toFixed(2)}`}>${netProfitUSD.toFixed(2)}</p>
           <p className="text-sm text-stone-400 mt-2 font-medium relative z-10 bg-stone-800 inline-block px-3 py-1 rounded-lg border border-stone-700">Libre de gastos</p>
         </div>
       </div>
@@ -1449,7 +1446,7 @@ function AdminKPIs({ orders, products, expenses, bcvRate }) {
   );
 }
 
-// --- ADMIN KANBAN ---
+// --- ADMIN KANBAN MEJORADO (SCROLL HORIZONTAL EN MÓVILES/TABLETS) ---
 function AdminKanban({ orders }) {
   const validOrders = orders.filter(o => o.status !== 'Cancelado');
   const cols = [
@@ -1464,11 +1461,12 @@ function AdminKanban({ orders }) {
   return (
     <div className="space-y-6 animate-fade-in w-full h-full">
       <div><h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><LayoutDashboard className="w-6 h-6 text-purple-600"/> Tablero de Producción</h2></div>
-      <div className="flex flex-col xl:flex-row gap-6 w-full min-h-[600px] pb-10">
+      
+      <div className="flex flex-row gap-4 md:gap-6 w-full min-h-[600px] pb-10 overflow-x-auto snap-x">
         {cols.map(col => {
           const colOrders = validOrders.filter(o => { if (col.id === 'Pendiente') return ['Pendiente', 'Abonado', 'Pagado'].includes(o.status); if (col.id === 'En Preparación') return o.status === 'En Preparación'; return o.status === 'Completado'; });
           return (
-            <div key={col.id} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)} className={`flex-1 flex flex-col bg-stone-100 rounded-3xl border-t-4 shadow-sm p-4 ${col.color}`}>
+            <div key={col.id} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)} className={`w-[85vw] sm:w-[320px] md:w-[350px] lg:flex-1 shrink-0 flex flex-col bg-stone-100 rounded-3xl border-t-4 shadow-sm p-4 ${col.color} snap-start`}>
               <div className="flex justify-between items-center mb-4 pb-2 border-b border-stone-200"><h3 className="font-bold text-gray-800 flex items-center gap-2">{col.icon} {col.title}</h3><span className="bg-white text-stone-600 font-bold px-2 py-0.5 rounded-full text-xs shadow-sm">{colOrders.length}</span></div>
               <div className="flex flex-col gap-3 flex-grow">
                 {colOrders.map(order => (
