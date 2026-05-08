@@ -8,7 +8,7 @@ import {
   Search, MessageCircle, Heart, Zap, Star, Gift, Truck, MousePointer2, Eye, Printer, Send, Users, ArrowUpRight, Clock,
   Map as MapIcon, ArrowUp, ArrowDown, Share2, AlertTriangle, Save, ShieldAlert,
   Download, Power, LayoutDashboard, GripVertical, Menu, SearchCode, ArrowDownUp,
-  Receipt, Ticket, Percent, WalletCards, UploadCloud, ImagePlus, PieChart, Route, Store
+  Receipt, Ticket, Percent, WalletCards, UploadCloud, ImagePlus, PieChart, Route, Store, BarChart3, Filter, StickyNote
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (Producción) ---
@@ -417,14 +417,12 @@ function AdminDashboard({ products, categories, orders, systemUsers, expenses, c
   };
   
   const [activeTab, setActiveTab] = useState(getInitialTab());
-  // El menú está visible en Desktop por defecto, pero oculto en móviles por defecto
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
 
   const isAdmin = currentUser?.role === 'admin';
   const isPreparador = currentUser?.role === 'preparador' || isAdmin;
   const isMotorizado = currentUser?.role === 'motorizado' || isAdmin;
 
-  // Si hace clic en un tab y es teléfono, se oculta el menú automáticamente
   const handleTabChange = (tab) => { 
     setActiveTab(tab); 
     if(window.innerWidth <= 768) setIsSidebarOpen(false); 
@@ -432,63 +430,71 @@ function AdminDashboard({ products, categories, orders, systemUsers, expenses, c
 
   return (
     <div className="animate-fade-in flex flex-col relative min-h-[80vh]">
-      {/* 🔴 BARRA SUPERIOR UNIVERSAL (HAMBURGUESA) */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-stone-200 w-full mb-6 print:hidden">
-        <span className="font-bold text-gray-800 flex items-center gap-2">
-          <Star className="w-5 h-5 text-red-500"/> Panel Administrativo
-        </span>
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors">
-          <Menu className="w-6 h-6 text-stone-700"/>
+      {/* 🔴 BARRA SUPERIOR UNIVERSAL (HAMBURGUESA A LA IZQUIERDA) */}
+      <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-stone-200 w-full mb-6 print:hidden">
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 bg-stone-100 hover:bg-stone-200 rounded-xl transition-all active:scale-95 text-stone-700">
+          <Menu className="w-6 h-6"/>
         </button>
+        <span className="font-bold text-gray-800 flex items-center gap-2 text-lg">
+          <Star className="w-6 h-6 text-red-500"/> Panel Administrativo
+        </span>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 relative flex-grow">
+      <div className="flex flex-col md:flex-row relative flex-grow overflow-hidden">
         
         {/* FONDO OSCURO EN MÓVILES CUANDO ESTÁ ABIERTO */}
-        {isSidebarOpen && <div className="fixed inset-0 bg-stone-900/60 z-[60] md:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>}
+        {isSidebarOpen && <div className="fixed inset-0 bg-stone-900/60 z-[60] md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)}></div>}
 
-        {/* 🔴 MENÚ LATERAL (SIDEBAR) */}
-        <div className={`fixed inset-y-0 left-0 z-[70] w-72 shrink-0 bg-white shadow-2xl md:shadow-sm md:border border-stone-200 p-5 transform transition-transform duration-300 md:h-auto md:rounded-3xl print:hidden overflow-y-auto ${isSidebarOpen ? 'translate-x-0 md:relative md:flex md:flex-col' : '-translate-x-full md:hidden'}`}>
-          <div className="flex items-center justify-between gap-3 mb-6 px-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600"><Star className="w-5 h-5" /></div>
-              <div><h3 className="font-bold text-gray-800 leading-tight">Menú Principal</h3><p className="text-[10px] text-stone-500 uppercase tracking-widest">{currentUser?.role}</p></div>
+        {/* 🔴 MENÚ LATERAL (SIDEBAR) CON ANIMACIÓN DE DESLIZAMIENTO SUAVE */}
+        <div className={`
+          fixed inset-y-0 left-0 z-[70] bg-white shadow-2xl transition-transform duration-300 ease-in-out transform
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:relative md:translate-x-0 md:shadow-none md:bg-transparent md:transition-all md:duration-300
+          ${isSidebarOpen ? 'md:w-72 md:opacity-100 md:mr-6' : 'md:w-0 md:opacity-0 md:mr-0 md:overflow-hidden'}
+          print:hidden shrink-0
+        `}>
+          <div className="w-72 bg-white h-full md:rounded-3xl md:border border-stone-200 p-5 flex flex-col overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 mb-6 px-2 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600"><Star className="w-5 h-5" /></div>
+                <div><h3 className="font-bold text-gray-800 leading-tight">Menú Principal</h3><p className="text-[10px] text-stone-500 uppercase tracking-widest">{currentUser?.role}</p></div>
+              </div>
+              <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1.5 bg-stone-100 rounded-full text-stone-500 hover:text-red-500 transition-colors"><X className="w-5 h-5"/></button>
             </div>
-            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1.5 bg-stone-100 rounded-full text-stone-500 hover:text-red-500"><X className="w-5 h-5"/></button>
-          </div>
-          
-          <nav className="space-y-1.5">
-            {isAdmin && <button onClick={() => handleTabChange('kpis')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'kpis' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><TrendingUp className="w-5 h-5" /> Dashboard & Reportes</button>}
-            {isAdmin && <button onClick={() => handleTabChange('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'orders' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><ShoppingBag className="w-5 h-5" /> Tabla de Pedidos {orders.filter((o)=>o.status==='Pendiente').length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{orders.filter((o)=>o.status==='Pendiente').length}</span>}</button>}
-            {isPreparador && <button onClick={() => handleTabChange('kanban')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'kanban' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><LayoutDashboard className="w-5 h-5" /> Producción (Kanban)</button>}
-            {isMotorizado && <button onClick={() => handleTabChange('delivery')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><MapIcon className="w-5 h-5" /> Rutas de Entrega</button>}
             
-            {isAdmin && (
-              <>
-                <button onClick={() => handleTabChange('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'customers' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
-                
-                <div className="pt-4 mt-4 border-t border-stone-100"></div>
-                
-                <button onClick={() => handleTabChange('expenses')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'expenses' ? 'bg-red-50 text-red-700 shadow-sm border border-red-100' : 'text-stone-600 hover:bg-stone-100'}`}><Receipt className="w-5 h-5" /> Gastos y Egresos</button>
-                <button onClick={() => handleTabChange('coupons')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'coupons' ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100' : 'text-stone-600 hover:bg-stone-100'}`}><Ticket className="w-5 h-5" /> Promos y Cupones</button>
-                <button onClick={() => handleTabChange('loyalty')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'loyalty' ? 'bg-pink-50 text-pink-700 shadow-sm border border-pink-100' : 'text-stone-600 hover:bg-stone-100'}`}><Heart className="w-5 h-5" /> Puntos Fidelización</button>
+            <nav className="space-y-1.5 flex-grow">
+              {isAdmin && <button onClick={() => handleTabChange('kpis')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'kpis' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><BarChart3 className="w-5 h-5" /> Dashboard & Reportes</button>}
+              {isAdmin && <button onClick={() => handleTabChange('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'orders' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><ShoppingBag className="w-5 h-5" /> Tabla de Pedidos {orders.filter((o)=>o.status==='Pendiente').length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{orders.filter((o)=>o.status==='Pendiente').length}</span>}</button>}
+              {isPreparador && <button onClick={() => handleTabChange('kanban')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'kanban' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><LayoutDashboard className="w-5 h-5" /> Producción (Kanban)</button>}
+              {isMotorizado && <button onClick={() => handleTabChange('delivery')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><MapIcon className="w-5 h-5" /> Rutas de Entrega</button>}
+              
+              {isAdmin && (
+                <>
+                  <button onClick={() => handleTabChange('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'customers' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Users className="w-5 h-5" /> Mis Clientes</button>
+                  
+                  <div className="pt-4 mt-4 border-t border-stone-100"></div>
+                  
+                  <button onClick={() => handleTabChange('expenses')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'expenses' ? 'bg-red-50 text-red-700 shadow-sm border border-red-100' : 'text-stone-600 hover:bg-stone-100'}`}><Receipt className="w-5 h-5" /> Gastos y Egresos</button>
+                  <button onClick={() => handleTabChange('coupons')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'coupons' ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100' : 'text-stone-600 hover:bg-stone-100'}`}><Ticket className="w-5 h-5" /> Promos y Cupones</button>
+                  <button onClick={() => handleTabChange('loyalty')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'loyalty' ? 'bg-pink-50 text-pink-700 shadow-sm border border-pink-100' : 'text-stone-600 hover:bg-stone-100'}`}><Heart className="w-5 h-5" /> Puntos Fidelización</button>
 
-                <div className="pt-4 mt-4 border-t border-stone-100"></div>
-                
-                <button onClick={() => handleTabChange('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
-                <button onClick={() => handleTabChange('categories')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
-                
-                <div className="pt-4 mt-4 border-t border-stone-100"></div>
-                <button onClick={handleToggleStore} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all font-bold text-sm border ${storeSettings.isOpen ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200 shadow-inner'}`}>
-                  <span className="flex items-center gap-2"><Power className="w-4 h-4"/> Tienda: {storeSettings.isOpen ? 'ABIERTA' : 'CERRADA'}</span>
-                </button>
-              </>
-            )}
-          </nav>
+                  <div className="pt-4 mt-4 border-t border-stone-100"></div>
+                  
+                  <button onClick={() => handleTabChange('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'products' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-5 h-5" /> Catálogo / Extras</button>
+                  <button onClick={() => handleTabChange('categories')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-medium text-sm ${activeTab === 'categories' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`}><List className="w-5 h-5" /> Categorías</button>
+                  
+                  <div className="pt-4 mt-4 border-t border-stone-100"></div>
+                  <button onClick={handleToggleStore} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all font-bold text-sm border ${storeSettings.isOpen ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200 shadow-inner'}`}>
+                    <span className="flex items-center gap-2"><Power className="w-4 h-4"/> Tienda: {storeSettings.isOpen ? 'ABIERTA' : 'CERRADA'}</span>
+                  </button>
+                </>
+              )}
+            </nav>
+          </div>
         </div>
 
         {/* 🔴 CONTENIDO PRINCIPAL */}
-        <div className="flex-1 min-w-0 transition-all duration-300">
+        <div className="flex-1 min-w-0 transition-all duration-300 w-full">
           <ErrorBoundary>
             {activeTab === 'kpis' && isAdmin && <AdminKPIs orders={orders} products={products} expenses={expenses} bcvRate={bcvRate} />}
             {activeTab === 'orders' && isAdmin && <AdminOrders orders={orders} bcvRate={bcvRate} products={products} />}
@@ -570,7 +576,7 @@ function AdminLoyalty({ settings }) {
   );
 }
 
-// --- MÓDULO MIS CLIENTES (ULTRA BLINDADO) ---
+// --- MÓDULO MIS CLIENTES ---
 function AdminCustomers({ orders, systemUsers }) {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -704,10 +710,10 @@ function AdminOrders({ orders, bcvRate, products }) {
   const [paymentForm, setPaymentForm] = useState({ method: 'Pago Móvil', inputAmount: '', inputCurrency: 'BS', customBcvRate: bcvRate, reference: '', bank: VENEZUELAN_BANKS[0], phone: '', accountName: '', notes: '' });
   const [viewPaymentsModal, setViewPaymentsModal] = useState({ isOpen: false, orderId: null });
   const [receiptModal, setReceiptModal] = useState({ isOpen: false, order: null });
+  const [labelModal, setLabelModal] = useState({ isOpen: false, order: null }); // 🔴 MODAL PARA ETIQUETA
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [editOrderId, setEditOrderId] = useState(null);
   
-  // 🔴 ESTADO ACTUALIZADO CON deliveryMethod
   const [manualOrder, setManualOrder] = useState({ deliveryMethod: 'Delivery', senderName: '', senderPhone: '', recipientName: '', recipientPhone: '', deliveryAddress: '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '', items: [] });
   const [manualProduct, setManualProduct] = useState('');
   const [manualQty, setManualQty] = useState(1);
@@ -758,8 +764,6 @@ function AdminOrders({ orders, bcvRate, products }) {
   const handleSaveOrder = async (e) => {
     e.preventDefault(); if (manualOrder.items.length === 0) return alert("Agrega al menos un producto.");
     const totalUSD = manualOrder.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
-    
-    // 🔴 Si es Pickup, forzamos que la dirección sea Retiro en Tienda
     const finalAddress = manualOrder.deliveryMethod === 'Pickup' ? 'Retiro en Tienda (Pickup)' : manualOrder.deliveryAddress;
 
     const orderData = { 
@@ -811,7 +815,6 @@ function AdminOrders({ orders, bcvRate, products }) {
                 <td className="p-4">
                   <div className="font-black text-gray-900">{order.displayId || 'PED-WEB'}</div>
                   <div className="text-xs text-stone-500 font-medium">{order.date && !isNaN(new Date(order.date).getTime()) ? new Date(order.date).toLocaleDateString() : 'N/A'}</div>
-                  {/* 🔴 BADGE DE MÉTODO DE ENTREGA */}
                   {order.deliveryMethod === 'Pickup' ? <span className="inline-block mt-1 text-[9px] bg-purple-100 text-purple-700 font-black px-2 py-0.5 rounded uppercase">🏪 Pickup</span> : <span className="inline-block mt-1 text-[9px] bg-blue-100 text-blue-700 font-black px-2 py-0.5 rounded uppercase">🛵 Delivery</span>}
                 </td>
                 <td className="p-4 text-sm text-gray-700"><div className="font-bold flex items-center gap-1"><User className="w-3 h-3 text-stone-400"/> {order.senderName || order.customerName || 'N/A'}</div><div className="text-stone-500 text-xs mt-0.5">📞 {order.senderPhone || order.phone || 'N/A'}</div></td>
@@ -821,9 +824,10 @@ function AdminOrders({ orders, bcvRate, products }) {
                   {balance > 0 && order.status !== 'Cancelado' && <button onClick={() => openPaymentModal(order)} className="mt-2 block text-xs bg-stone-900 text-white hover:bg-black px-3 py-1.5 rounded-lg font-bold transition-colors shadow-sm">+ Añadir Pago</button>}
                 </td>
                 <td className="p-4 flex items-center justify-center gap-2">
-                  <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value)} className="text-xs font-black uppercase tracking-wider px-3 py-2 rounded-xl border-0 outline-none cursor-pointer shadow-sm bg-stone-100"><option value="Pendiente">Pendiente</option><option value="Abonado">Abonado</option><option value="Pagado">Pagado</option><option value="En Preparación">En Preparación</option><option value="Completado">Completado</option><option value="Cancelado">Cancelado</option></select>
+                  <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value)} className="text-xs font-black uppercase tracking-wider px-2 py-2 rounded-xl border-0 outline-none cursor-pointer shadow-sm bg-stone-100"><option value="Pendiente">Pendiente</option><option value="Abonado">Abonado</option><option value="Pagado">Pagado</option><option value="En Preparación">En Preparación</option><option value="Completado">Completado</option><option value="Cancelado">Cancelado</option></select>
                   <button onClick={() => openEditModal(order)} className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors shadow-sm" title="Editar"><Edit className="w-5 h-5" /></button>
-                  <button onClick={() => setReceiptModal({ isOpen: true, order })} className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors shadow-sm" title="Imprimir"><Printer className="w-5 h-5" /></button>
+                  <button onClick={() => setLabelModal({ isOpen: true, order })} className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-xl transition-colors shadow-sm" title="Imprimir Etiqueta para Caja"><StickyNote className="w-5 h-5" /></button>
+                  <button onClick={() => setReceiptModal({ isOpen: true, order })} className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors shadow-sm" title="Nota de Entrega / Recibo"><Printer className="w-5 h-5" /></button>
                 </td>
               </tr>
             )})}
@@ -831,9 +835,9 @@ function AdminOrders({ orders, bcvRate, products }) {
         </table>
       </div>
 
-      {/* Modal Añadir Pago */}
+      {/* Modales de pagos y edición de orden */}
       {paymentModal.isOpen && (
-        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
             <h3 className="text-xl font-bold mb-4">Añadir Pago</h3>
             <form onSubmit={handleRegisterPayment} className="space-y-4">
@@ -853,9 +857,8 @@ function AdminOrders({ orders, bcvRate, products }) {
         </div>
       )}
 
-      {/* Modal Ver Pagos */}
       {viewPaymentsModal.isOpen && (
-        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold">Historial de Pagos</h3><button onClick={() => setViewPaymentsModal({ isOpen: false, orderId: null })} className="text-stone-400 hover:text-stone-600"><X className="w-6 h-6"/></button></div>
             <div className="space-y-3">
@@ -871,33 +874,88 @@ function AdminOrders({ orders, bcvRate, products }) {
         </div>
       )}
 
-      {/* Modal Recibo */}
+      {/* 🔴 NOTA DE ENTREGA / RECIBO CLÁSICO */}
       {receiptModal.isOpen && (
-        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:bg-white print:p-0">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative print:shadow-none print:w-full">
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:bg-white print:p-0">
+          <div className="bg-white p-8 w-full max-w-md shadow-2xl relative print:shadow-none print:w-full border border-stone-200 rounded-3xl print:rounded-none">
             <button onClick={() => setReceiptModal({ isOpen: false, order: null })} className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 print:hidden"><X className="w-6 h-6"/></button>
-            <div className="text-center mb-6"><h2 className="text-2xl font-black font-serif">Decomer Frutas</h2><p className="text-sm text-stone-500">Recibo de Pedido</p></div>
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between border-b pb-2"><span className="font-bold">Orden:</span> <span>{receiptModal.order.displayId}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="font-bold">Cliente:</span> <span>{receiptModal.order.senderName || receiptModal.order.customerName}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="font-bold">Fecha:</span> <span>{receiptModal.order.date && !isNaN(new Date(receiptModal.order.date).getTime()) ? new Date(receiptModal.order.date).toLocaleDateString() : ''}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="font-bold">Método:</span> <span>{receiptModal.order.deliveryMethod === 'Pickup' ? 'Retiro en Tienda' : 'Delivery'}</span></div>
-              <div className="border-b pb-2"><p className="font-bold mb-2">Productos:</p>{receiptModal.order.items.map((i, idx) => (<div key={idx} className="flex justify-between text-xs mb-1"><span>{i.quantity}x {i.name}</span><span>${(Number(i.price)*i.quantity).toFixed(2)}</span></div>))}</div>
-              <div className="flex justify-between font-black text-lg pt-2"><span>Total USD:</span> <span>${Number(receiptModal.order.totalUSD).toFixed(2)}</span></div>
+            
+            <div className="text-center mb-6 border-b border-stone-200 pb-6">
+              <h2 className="text-3xl font-black font-serif text-gray-900">Decomer Frutas</h2>
+              <p className="text-sm text-stone-500 mt-1 uppercase tracking-widest font-bold">Nota de Entrega</p>
             </div>
-            <button onClick={() => window.print()} className="mt-8 w-full bg-stone-900 text-white font-bold py-3 rounded-xl print:hidden flex justify-center gap-2 items-center"><Printer className="w-5 h-5"/> Imprimir Recibo</button>
+            
+            <div className="space-y-5 text-sm text-gray-800">
+              <div className="flex justify-between items-end"><span className="font-bold text-stone-500">Orden No.</span> <span className="font-black text-lg">{receiptModal.order.displayId}</span></div>
+              <div className="flex justify-between items-end"><span className="font-bold text-stone-500">Fecha de Emisión:</span> <span className="font-medium">{receiptModal.order.date && !isNaN(new Date(receiptModal.order.date).getTime()) ? new Date(receiptModal.order.date).toLocaleDateString() : ''}</span></div>
+              <div className="flex justify-between items-end"><span className="font-bold text-stone-500">Cliente (Remitente):</span> <span className="font-bold">{receiptModal.order.senderName || receiptModal.order.customerName}</span></div>
+              <div className="flex justify-between items-end"><span className="font-bold text-stone-500">Teléfono:</span> <span className="font-medium">{receiptModal.order.senderPhone || receiptModal.order.phone}</span></div>
+              <div className="flex justify-between items-end"><span className="font-bold text-stone-500">Método de Entrega:</span> <span className="font-bold uppercase bg-stone-100 px-2 py-0.5 rounded">{receiptModal.order.deliveryMethod === 'Pickup' ? 'Retiro en Tienda' : 'Delivery'}</span></div>
+              
+              <div className="pt-4 border-t border-stone-200 border-dashed">
+                <p className="font-bold text-stone-500 mb-3 uppercase tracking-wider text-xs">Detalle de Productos</p>
+                {receiptModal.order.items.map((i, idx) => (
+                  <div key={idx} className="flex justify-between text-sm mb-2 font-medium">
+                    <span>{i.quantity}x {i.name}</span>
+                    <span className="font-bold">${(Number(i.price)*i.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="pt-4 border-t border-stone-200 border-dashed flex justify-between font-black text-xl">
+                <span>TOTAL USD:</span> 
+                <span>${Number(receiptModal.order.totalUSD).toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <button onClick={() => window.print()} className="mt-8 w-full bg-stone-900 hover:bg-black text-white font-bold py-3.5 rounded-xl print:hidden flex justify-center gap-2 items-center transition-colors shadow-md"><Printer className="w-5 h-5"/> Imprimir Recibo</button>
           </div>
         </div>
       )}
 
-      {/* Modal Crear/Editar Pedido Manual */}
+      {/* 🔴 ETIQUETA PARA CAJA (NUEVO) */}
+      {labelModal.isOpen && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in print:bg-white print:p-0">
+          <div className="bg-white p-8 w-full max-w-lg shadow-2xl relative print:shadow-none print:w-full border-2 border-stone-800 border-dashed rounded-3xl print:border-solid print:rounded-none">
+            <button onClick={() => setLabelModal({ isOpen: false, order: null })} className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 print:hidden"><X className="w-6 h-6"/></button>
+            
+            <div className="text-center mb-6 border-b-2 border-stone-800 pb-6">
+              <h2 className="text-4xl font-black font-serif text-gray-900 flex justify-center items-center gap-3"><Gift className="w-8 h-8"/> Decomer Frutas</h2>
+              <p className="text-sm font-bold mt-2 uppercase tracking-widest">{labelModal.order.displayId}</p>
+            </div>
+            
+            <div className="space-y-6 text-lg text-gray-900">
+              <div><p className="text-sm font-bold text-stone-500 mb-1">DE (Remitente):</p><p className="font-black text-2xl uppercase leading-tight">{labelModal.order.senderName || labelModal.order.customerName || 'Anónimo'}</p></div>
+              <div><p className="text-sm font-bold text-stone-500 mb-1">PARA (Destinatario):</p><p className="font-black text-2xl uppercase leading-tight">{labelModal.order.recipientName || 'Anónimo'}</p></div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-sm font-bold text-stone-500 mb-1">FECHA:</p><p className="font-bold">{labelModal.order.deliveryDate || 'N/A'}</p></div>
+                <div><p className="text-sm font-bold text-stone-500 mb-1">TURNO:</p><p className="font-bold">{labelModal.order.deliveryTimeSlot || 'N/A'}</p></div>
+              </div>
+
+              {labelModal.order.deliveryMethod === 'Delivery' && (
+                <div><p className="text-sm font-bold text-stone-500 mb-1">DIRECCIÓN DE ENTREGA:</p><p className="font-bold leading-snug">{labelModal.order.deliveryAddress || 'Retiro en Tienda'}</p></div>
+              )}
+
+              {labelModal.order.dedication && (
+                <div className="p-5 bg-stone-100 rounded-2xl border border-stone-200 mt-4">
+                  <p className="text-sm font-bold text-stone-500 mb-2 flex items-center gap-2"><StickyNote className="w-4 h-4"/> DEDICATORIA:</p>
+                  <p className="italic font-medium text-lg leading-relaxed">"{labelModal.order.dedication}"</p>
+                </div>
+              )}
+            </div>
+            
+            <button onClick={() => window.print()} className="mt-8 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl print:hidden flex justify-center gap-2 items-center transition-colors shadow-md"><Printer className="w-5 h-5"/> Imprimir Etiqueta</button>
+          </div>
+        </div>
+      )}
+
       {isOrderModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
             <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center"><h3 className="font-bold text-xl text-gray-800">{editOrderId ? 'Editar Pedido' : 'Nuevo Pedido Manual'}</h3><button onClick={closeOrderModal} className="bg-stone-200 hover:bg-stone-300 p-2 rounded-full"><X className="w-5 h-5"/></button></div>
             <div className="p-6 overflow-y-auto space-y-6">
               
-              {/* 🔴 SELECTOR DE MÉTODO DE ENTREGA */}
               <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
                 <label className="block text-xs font-bold mb-2 text-blue-800 uppercase">Método de Entrega</label>
                 <div className="flex gap-3">
@@ -911,7 +969,6 @@ function AdminOrders({ orders, bcvRate, products }) {
                 <div><label className="block text-xs font-bold mb-1 text-stone-500 uppercase">Destinatario</label><input type="text" placeholder="Nombre" value={manualOrder.recipientName} onChange={e=>setManualOrder({...manualOrder, recipientName:e.target.value})} className="w-full px-3 py-2 border rounded-xl text-sm mb-2"/><input type="text" placeholder="Teléfono" value={manualOrder.recipientPhone} onChange={e=>setManualOrder({...manualOrder, recipientPhone:e.target.value})} className="w-full px-3 py-2 border rounded-xl text-sm"/></div>
               </div>
 
-              {/* 🔴 OCULTAR DIRECCIÓN SI ES PICKUP */}
               {manualOrder.deliveryMethod === 'Delivery' && (
                 <div><label className="block text-xs font-bold mb-1 text-stone-500 uppercase">Dirección de Entrega</label><input type="text" value={manualOrder.deliveryAddress} onChange={e=>setManualOrder({...manualOrder, deliveryAddress:e.target.value})} className="w-full px-3 py-2 border rounded-xl text-sm"/></div>
               )}
@@ -943,11 +1000,12 @@ function AdminOrders({ orders, bcvRate, products }) {
   );
 }
 
-// --- ADMIN PRODUCTOS (CATÁLOGO Y EXTRAS) ---
+// --- ADMIN PRODUCTOS (CATÁLOGO Y EXTRAS CON MODAL) ---
 function AdminProducts({ products, categories }) {
   const [form, setForm] = useState({ name: '', description: '', price: '', categoryId: '', image: '', stock: '', badge: '', isExtra: false, emoji: '' });
   const [isEditing, setIsEditing] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -969,54 +1027,39 @@ function AdminProducts({ products, categories }) {
     const productData = { ...form, price: Number(form.price) };
     if (isEditing) await updateDoc(doc(db, 'products', isEditing), productData).catch(e=>console.error(e));
     else await addDoc(collection(db, 'products'), productData).catch(e=>console.error(e));
-    setForm({ name: '', description: '', price: '', categoryId: '', image: '', stock: '', badge: '', isExtra: false, emoji: '' });
-    setIsEditing(null);
+    closeModal();
   };
 
   const handleEdit = (product) => {
     setForm({ name: product.name, description: product.description, price: product.price, categoryId: product.categoryId || '', image: product.image || '', stock: product.stock || '', badge: product.badge || '', isExtra: product.isExtra || false, emoji: product.emoji || '' });
     setIsEditing(product.id);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setIsEditing(null);
+    setForm({ name: '', description: '', price: '', categoryId: '', image: '', stock: '', badge: '', isExtra: false, emoji: '' });
   };
 
   const handleDelete = async (id) => { if (window.confirm("¿Seguro de eliminar este producto?")) await deleteDoc(doc(db, 'products', id)).catch(e=>console.error(e)); };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Tag className="w-6 h-6 text-red-500"/> Catálogo de Productos</h2></div>
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
-        <h3 className="font-bold text-gray-800 mb-4">{isEditing ? 'Editar Producto' : 'Añadir Nuevo Producto'}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label className="block text-xs font-bold text-stone-500 mb-1">Nombre</label><input required type="text" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className="w-full px-4 py-2 border rounded-xl" /></div>
-          <div><label className="block text-xs font-bold text-stone-500 mb-1">Precio USD</label><input required type="number" step="0.01" value={form.price} onChange={e=>setForm({...form, price:e.target.value})} className="w-full px-4 py-2 border rounded-xl" /></div>
-          <div className="md:col-span-2"><label className="block text-xs font-bold text-stone-500 mb-1">Descripción</label><textarea required value={form.description} onChange={e=>setForm({...form, description:e.target.value})} className="w-full px-4 py-2 border rounded-xl" rows="2"></textarea></div>
-          <div><label className="block text-xs font-bold text-stone-500 mb-1">Categoría</label><select value={form.categoryId} onChange={e=>setForm({...form, categoryId:e.target.value})} className="w-full px-4 py-2 border rounded-xl"><option value="">Seleccione Categoría</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-          <div><label className="block text-xs font-bold text-stone-500 mb-1">Stock (Vacío = Infinito)</label><input type="number" value={form.stock} onChange={e=>setForm({...form, stock:e.target.value})} className="w-full px-4 py-2 border rounded-xl" /></div>
-          <div><label className="block text-xs font-bold text-stone-500 mb-1">Etiqueta (Ej: NUEVO, AGOTADO)</label><input type="text" value={form.badge} onChange={e=>setForm({...form, badge:e.target.value})} className="w-full px-4 py-2 border rounded-xl" /></div>
-          
-          <div className="flex items-center gap-2 mt-6">
-            <input type="checkbox" id="isExtra" checked={form.isExtra} onChange={e=>setForm({...form, isExtra:e.target.checked})} className="w-4 h-4"/>
-            <label htmlFor="isExtra" className="text-sm font-bold text-stone-600">Es un Extra (Topping / Adicional)</label>
-          </div>
-          
-          {form.isExtra ? (
-            <div><label className="block text-xs font-bold text-stone-500 mb-1">Emoji (Para mostrar en el carrito)</label><input type="text" value={form.emoji} onChange={e=>setForm({...form, emoji:e.target.value})} placeholder="✨" className="w-full px-4 py-2 border rounded-xl" /></div>
-          ) : (
-            <div className="md:col-span-2"><label className="block text-xs font-bold text-stone-500 mb-1">Imagen (JPG/PNG)</label>
-              <div className="flex items-center gap-4">
-                <label className="cursor-pointer bg-stone-100 hover:bg-stone-200 px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm transition-colors border"><UploadCloud className="w-5 h-5"/> {uploading ? 'Subiendo...' : 'Subir Imagen'}<input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading}/></label>
-                {form.image && <img src={form.image} alt="Preview" className="h-12 w-12 object-cover rounded-lg border shadow-sm"/>}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="mt-6 flex gap-3"><button type="submit" disabled={uploading} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-md transition-all">{isEditing ? 'Actualizar' : 'Guardar'}</button>{isEditing && <button type="button" onClick={()=>{setIsEditing(null); setForm({ name: '', description: '', price: '', categoryId: '', image: '', stock: '', badge: '', isExtra: false, emoji: '' });}} className="bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold py-2.5 px-6 rounded-xl transition-colors">Cancelar</button>}</div>
-      </form>
+    <div className="space-y-6 animate-fade-in relative">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-stone-200 pb-4">
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <Tag className="w-6 h-6 text-red-500"/> Catálogo de Productos
+        </h2>
+        <button onClick={() => { setIsEditing(null); setIsModalOpen(true); }} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-md transition-all">
+          <Plus className="w-5 h-5" /> Nuevo Producto
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {products.map(p => (
-          <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col relative">
+          <div key={p.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md border border-stone-100 overflow-hidden flex flex-col relative transition-shadow">
             {p.badge && <span className="absolute top-2 right-2 bg-stone-900 text-white text-[10px] font-black px-2 py-1 rounded z-10">{p.badge}</span>}
-            {p.isExtra ? <div className="h-32 bg-stone-50 flex items-center justify-center text-5xl">{p.emoji || '✨'}</div> : <img src={p.image} className="h-32 w-full object-cover bg-stone-100" alt={p.name} />}
+            {p.isExtra ? <div className="h-32 bg-stone-50 flex items-center justify-center text-5xl border-b border-stone-100">{p.emoji || '✨'}</div> : <img src={p.image} className="h-32 w-full object-cover bg-stone-100" alt={p.name} />}
             <div className="p-4 flex-grow flex flex-col">
               <h4 className="font-bold text-gray-800 line-clamp-1">{p.name}</h4>
               <p className="font-black text-red-600">${Number(p.price).toFixed(2)}</p>
@@ -1028,7 +1071,52 @@ function AdminProducts({ products, categories }) {
             </div>
           </div>
         ))}
+        {products.length === 0 && <div className="col-span-full py-12 text-center text-stone-400 font-medium bg-white rounded-3xl border border-dashed border-stone-300">No hay productos en el catálogo. ¡Agrega el primero!</div>}
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2"><Tag className="w-5 h-5 text-red-500"/> {isEditing ? 'Editar Producto' : 'Añadir Nuevo Producto'}</h3>
+              <button onClick={closeModal} className="bg-stone-200 hover:bg-stone-300 p-2 rounded-full text-stone-600 transition-colors"><X className="w-5 h-5"/></button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto bg-white">
+              <form id="product-form" onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><label className="block text-xs font-bold text-stone-500 mb-1">Nombre del Producto</label><input required type="text" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl bg-stone-50 outline-none focus:border-red-500" /></div>
+                  <div><label className="block text-xs font-bold text-stone-500 mb-1">Precio (USD $)</label><input required type="number" step="0.01" value={form.price} onChange={e=>setForm({...form, price:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl bg-stone-50 outline-none focus:border-red-500 font-bold" /></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-bold text-stone-500 mb-1">Descripción</label><textarea required value={form.description} onChange={e=>setForm({...form, description:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl bg-stone-50 outline-none focus:border-red-500" rows="3"></textarea></div>
+                  <div><label className="block text-xs font-bold text-stone-500 mb-1">Categoría</label><select value={form.categoryId} onChange={e=>setForm({...form, categoryId:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl bg-stone-50 outline-none focus:border-red-500"><option value="">Seleccione Categoría</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                  <div><label className="block text-xs font-bold text-stone-500 mb-1">Stock (Dejar vacío si es infinito)</label><input type="number" placeholder="Ej: 10" value={form.stock} onChange={e=>setForm({...form, stock:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl bg-stone-50 outline-none focus:border-red-500" /></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-bold text-stone-500 mb-1">Etiqueta Resaltada (Opcional, Ej: NUEVO, 50% OFF)</label><input type="text" placeholder="Ej: MÁS VENDIDO" value={form.badge} onChange={e=>setForm({...form, badge:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl bg-stone-50 outline-none focus:border-red-500" /></div>
+                  
+                  <div className="md:col-span-2 p-4 bg-blue-50 border border-blue-100 rounded-2xl mt-2 flex items-center gap-3">
+                    <input type="checkbox" id="isExtra" checked={form.isExtra} onChange={e=>setForm({...form, isExtra:e.target.checked})} className="w-5 h-5 accent-blue-600"/>
+                    <label htmlFor="isExtra" className="text-sm font-bold text-blue-900 cursor-pointer">Marcar como Extra / Adicional (Ej: Globo, Topping)</label>
+                  </div>
+                  
+                  {form.isExtra ? (
+                    <div className="md:col-span-2"><label className="block text-xs font-bold text-stone-500 mb-1">Emoji Representativo (Se mostrará en vez de foto)</label><input type="text" value={form.emoji} onChange={e=>setForm({...form, emoji:e.target.value})} placeholder="Ej: ✨🎈🍫" className="w-full px-4 py-3 border border-stone-200 rounded-xl bg-white text-2xl text-center shadow-inner" /></div>
+                  ) : (
+                    <div className="md:col-span-2"><label className="block text-xs font-bold text-stone-500 mb-1">Imagen del Producto (JPG/PNG)</label>
+                      <div className="flex items-center gap-4 bg-stone-50 p-4 border border-stone-200 rounded-2xl">
+                        <label className="cursor-pointer bg-white hover:bg-stone-100 px-5 py-3 rounded-xl flex items-center gap-2 font-bold text-sm transition-colors border shadow-sm"><UploadCloud className="w-5 h-5 text-stone-500"/> {uploading ? 'Subiendo...' : 'Seleccionar Imagen'}<input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading}/></label>
+                        {form.image && <div className="relative"><img src={form.image} alt="Preview" className="h-16 w-16 object-cover rounded-xl border shadow-sm"/></div>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </form>
+            </div>
+            <div className="p-6 border-t border-stone-100 bg-white shrink-0 flex gap-3">
+              <button type="button" onClick={closeModal} className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-3.5 rounded-xl transition-colors">Cancelar</button>
+              <button form="product-form" type="submit" disabled={uploading} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all">{isEditing ? 'Guardar Cambios' : 'Crear Producto'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1178,18 +1266,16 @@ function AdminCoupons({ coupons }) {
   );
 }
 
-// --- ADMIN KPIs MEJORADO CON DESCARGA CSV ---
+// --- ADMIN KPIs REORGANIZADO Y MEJORADO ---
 function AdminKPIs({ orders, products, expenses, bcvRate }) {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
 
   const validOrders = orders.filter((o) => o.status !== 'Cancelado');
   
-  // Órdenes totales de todos los tiempos
   const totalHistoricoVentasUSD = validOrders.reduce((sum, o) => sum + (Number(o.totalUSD) || 0), 0);
   const totalHistoricoGastosUSD = expenses.reduce((sum, e) => sum + (Number(e.amountUSD) || 0), 0);
 
-  // Filtro por mes seleccionado
   const monthOrders = validOrders.filter((o) => { 
     if(!o.date) return false; 
     try { const d = new Date(o.date); return !isNaN(d.getTime()) && d.getMonth() === filterMonth && d.getFullYear() === filterYear; } catch { return false; } 
@@ -1204,7 +1290,6 @@ function AdminKPIs({ orders, products, expenses, bcvRate }) {
   const monthExpensesUSD = monthExpensesList.reduce((sum, e) => sum + Number(e.amountUSD), 0);
   const netProfitUSD = monthSalesUSD - monthExpensesUSD;
 
-  // Desglose de gastos por categoría
   const expensesByCategory = monthExpensesList.reduce((acc, exp) => {
     const cat = exp.category || 'Otros';
     acc[cat] = (acc[cat] || 0) + Number(exp.amountUSD);
@@ -1217,7 +1302,6 @@ function AdminKPIs({ orders, products, expenses, bcvRate }) {
     return Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5);
   }, [monthOrders]);
 
-  // 🔴 FUNCIÓN PARA DESCARGAR REPORTE CSV
   const handleDownloadReport = () => {
     const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     let csv = `REPORTE FINANCIERO DECOMER FRUTAS - ${monthNames[filterMonth]} ${filterYear}\n\n`;
@@ -1254,88 +1338,112 @@ function AdminKPIs({ orders, products, expenses, bcvRate }) {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6 animate-fade-in relative">
+      
+      {/* 🔴 HEADER CON FILTROS ORDENADOS */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-stone-200">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><PieChart className="w-6 h-6 text-indigo-600"/> Dashboard & Finanzas</h2>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><BarChart3 className="w-6 h-6 text-indigo-600"/> Rendimiento Mensual</h2>
+          <p className="text-stone-500 text-sm mt-1">Analíticas financieras y volumen de ventas.</p>
         </div>
-        <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-          <div className="flex gap-2 bg-white p-1 rounded-xl shadow-sm border border-stone-200">
-            <select value={filterMonth} onChange={(e) => setFilterMonth(Number(e.target.value))} className="bg-transparent font-bold text-sm outline-none px-3 py-2 cursor-pointer text-stone-700">
+        
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 p-1.5 rounded-xl">
+            <Filter className="w-4 h-4 text-stone-400 ml-2"/>
+            <select value={filterMonth} onChange={(e) => setFilterMonth(Number(e.target.value))} className="bg-transparent font-bold text-sm outline-none px-2 py-1 cursor-pointer text-stone-700">
               {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map((m, i) => <option key={i} value={i}>{m}</option>)}
             </select>
-            <select value={filterYear} onChange={(e) => setFilterYear(Number(e.target.value))} className="bg-transparent font-bold text-sm outline-none px-3 py-2 cursor-pointer border-l border-stone-200 text-stone-700">
+            <span className="text-stone-300">|</span>
+            <select value={filterYear} onChange={(e) => setFilterYear(Number(e.target.value))} className="bg-transparent font-bold text-sm outline-none px-2 py-1 cursor-pointer text-stone-700">
               {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-          {/* 🔴 BOTÓN DESCARGAR REPORTE */}
-          <button onClick={handleDownloadReport} className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md">
+          <button onClick={handleDownloadReport} className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md ml-auto lg:ml-0">
             <Download className="w-4 h-4"/> Descargar CSV
           </button>
         </div>
       </div>
 
+      {/* 🔴 TARJETAS DE RESUMEN (KPIs) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white border border-stone-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><TrendingUp className="w-24 h-24 text-blue-500"/></div>
-          <p className="text-stone-500 text-sm font-bold mb-1 uppercase tracking-wider relative z-10">Ventas Brutas</p>
-          <p className="text-4xl font-black text-gray-900 relative z-10">${monthSalesUSD.toFixed(2)}</p>
-          <p className="text-xs text-stone-400 mt-2 font-medium relative z-10">{monthOrders.length} pedidos completados</p>
+        <div className="bg-white border border-stone-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><TrendingUp className="w-32 h-32 text-blue-500"/></div>
+          <p className="text-stone-500 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Ingresos (Ventas)</p>
+          <p className="text-4xl font-black text-gray-900 relative z-10 mt-2">${monthSalesUSD.toFixed(2)}</p>
+          <p className="text-sm text-stone-500 mt-2 font-medium relative z-10 bg-stone-50 inline-block px-3 py-1 rounded-lg border border-stone-100">{monthOrders.length} pedidos pagados</p>
         </div>
         
-        <div className="bg-white border border-stone-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><Receipt className="w-24 h-24 text-red-500"/></div>
-          <p className="text-stone-500 text-sm font-bold mb-1 uppercase tracking-wider relative z-10">Gastos Totales</p>
-          <p className="text-4xl font-black text-red-600 relative z-10">-${monthExpensesUSD.toFixed(2)}</p>
-          <p className="text-xs text-stone-400 mt-2 font-medium relative z-10">{monthExpensesList.length} registros de egreso</p>
+        <div className="bg-white border border-stone-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Receipt className="w-32 h-32 text-red-500"/></div>
+          <p className="text-stone-500 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500"></div> Egresos (Gastos)</p>
+          <p className="text-4xl font-black text-red-600 relative z-10 mt-2">-${monthExpensesUSD.toFixed(2)}</p>
+          <p className="text-sm text-stone-500 mt-2 font-medium relative z-10 bg-stone-50 inline-block px-3 py-1 rounded-lg border border-stone-100">{monthExpensesList.length} registros</p>
         </div>
         
-        <div className="bg-stone-900 p-6 rounded-3xl shadow-xl text-white relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform"><DollarSign className="w-24 h-24 text-green-400"/></div>
-          <p className="text-stone-400 text-sm font-bold mb-1 uppercase tracking-wider relative z-10">Ganancia Neta Real</p>
-          <p className={`text-5xl font-black relative z-10 ${netProfitUSD >= 0 ? 'text-green-400' : 'text-red-400'}`}>${netProfitUSD.toFixed(2)}</p>
-          <p className="text-xs text-stone-400 mt-2 font-medium relative z-10">Lo que queda libre tras restar gastos</p>
+        <div className="bg-stone-900 border border-stone-800 p-6 rounded-3xl shadow-xl text-white relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><DollarSign className="w-32 h-32 text-green-400"/></div>
+          <p className="text-stone-400 text-xs font-black mb-1 uppercase tracking-widest relative z-10 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-400"></div> Ganancia Neta Real</p>
+          <p className={`text-5xl font-black relative z-10 mt-2 ${netProfitUSD >= 0 ? 'text-white' : 'text-red-400'}`}>${netProfitUSD.toFixed(2)}</p>
+          <p className="text-sm text-stone-400 mt-2 font-medium relative z-10 bg-stone-800 inline-block px-3 py-1 rounded-lg border border-stone-700">Libre de gastos</p>
         </div>
       </div>
 
+      {/* 🔴 SECCIÓN DE LISTAS/GRÁFICOS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
-          <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">Desglose de Gastos (Este Mes)</h3>
+        
+        {/* Desglose de Gastos */}
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200 flex flex-col h-full">
+          <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 border-b border-stone-100 pb-4"><PieChart className="w-5 h-5 text-red-500"/> Distribución de Gastos</h3>
           {Object.keys(expensesByCategory).length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-5 flex-grow">
               {Object.entries(expensesByCategory).sort((a,b)=>b[1]-a[1]).map(([cat, amount]) => (
-                <div key={cat}>
-                  <div className="flex justify-between text-sm font-bold mb-1"><span className="text-stone-600">{cat}</span><span className="text-red-600">-${amount.toFixed(2)}</span></div>
-                  <div className="w-full bg-stone-100 rounded-full h-2"><div className="bg-red-500 h-2 rounded-full" style={{ width: `${(amount / monthExpensesUSD) * 100}%` }}></div></div>
+                <div key={cat} className="group">
+                  <div className="flex justify-between text-sm font-bold mb-2"><span className="text-stone-700">{cat}</span><span className="text-red-600 bg-red-50 px-2 py-0.5 rounded-md">-${amount.toFixed(2)}</span></div>
+                  <div className="w-full bg-stone-100 rounded-full h-2.5 overflow-hidden"><div className="bg-red-500 h-full rounded-full transition-all group-hover:bg-red-600" style={{ width: `${(amount / monthExpensesUSD) * 100}%` }}></div></div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-stone-500 text-center py-8">No hay gastos registrados este mes.</p>
+            <div className="flex-grow flex flex-col items-center justify-center text-stone-400 py-10">
+              <Receipt className="w-12 h-12 mb-3 opacity-20"/>
+              <p className="text-sm font-medium">Todo limpio. No hay gastos este mes.</p>
+            </div>
           )}
         </div>
 
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
-          <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">Top 5 Productos más vendidos (Este Mes)</h3>
+        {/* Top 5 Productos */}
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200 flex flex-col h-full">
+          <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 border-b border-stone-100 pb-4"><Star className="w-5 h-5 text-yellow-500"/> Productos Más Vendidos</h3>
           {topProducts.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-3 flex-grow">
               {topProducts.map(([name, qty], idx) => (
-                <div key={idx} className="flex justify-between items-center p-3 bg-stone-50 rounded-xl border border-stone-100">
-                  <span className="font-bold text-gray-700 text-sm flex items-center gap-2"><span className="text-stone-400">#{idx + 1}</span> {name}</span>
-                  <span className="bg-blue-100 text-blue-800 font-black px-3 py-1 rounded-full text-xs">{qty} uds.</span>
+                <div key={idx} className="flex justify-between items-center p-3.5 bg-stone-50 hover:bg-stone-100 rounded-xl border border-stone-200 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : idx === 1 ? 'bg-stone-200 text-stone-600 border border-stone-300' : idx === 2 ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-white text-stone-400 border border-stone-200'}`}>
+                      {idx + 1}
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">{name}</span>
+                  </div>
+                  <span className="bg-white border border-stone-200 text-stone-700 font-black px-3 py-1.5 rounded-lg text-xs shadow-sm">{qty} uds.</span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-stone-500 text-center py-8">No hay suficientes ventas este mes para mostrar.</p>
+            <div className="flex-grow flex flex-col items-center justify-center text-stone-400 py-10">
+              <Package className="w-12 h-12 mb-3 opacity-20"/>
+              <p className="text-sm font-medium">Aún no hay ventas registradas este mes.</p>
+            </div>
           )}
         </div>
       </div>
       
-      <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 flex flex-wrap gap-6 justify-around text-center text-sm mt-4">
-        <div><p className="text-stone-500 font-bold uppercase text-xs">Ventas Históricas (Total)</p><p className="font-black text-gray-900 text-lg">${totalHistoricoVentasUSD.toFixed(2)}</p></div>
-        <div><p className="text-stone-500 font-bold uppercase text-xs">Gastos Históricos (Total)</p><p className="font-black text-red-600 text-lg">-${totalHistoricoGastosUSD.toFixed(2)}</p></div>
-        <div><p className="text-stone-500 font-bold uppercase text-xs">Ganancia Histórica</p><p className="font-black text-green-600 text-lg">${(totalHistoricoVentasUSD - totalHistoricoGastosUSD).toFixed(2)}</p></div>
+      {/* 🔴 RESUMEN HISTÓRICO GLOBALES */}
+      <div className="bg-gradient-to-r from-stone-100 to-stone-50 p-6 rounded-3xl border border-stone-200 flex flex-wrap gap-6 justify-around text-center items-center mt-6">
+        <div className="flex flex-col items-center"><p className="text-stone-500 font-bold uppercase text-[10px] tracking-widest mb-1">Ventas Históricas (De por vida)</p><p className="font-black text-gray-900 text-xl">${totalHistoricoVentasUSD.toFixed(2)}</p></div>
+        <div className="w-px h-10 bg-stone-300 hidden md:block"></div>
+        <div className="flex flex-col items-center"><p className="text-stone-500 font-bold uppercase text-[10px] tracking-widest mb-1">Gastos Históricos (De por vida)</p><p className="font-black text-red-600 text-xl">-${totalHistoricoGastosUSD.toFixed(2)}</p></div>
+        <div className="w-px h-10 bg-stone-300 hidden md:block"></div>
+        <div className="flex flex-col items-center"><p className="text-stone-500 font-bold uppercase text-[10px] tracking-widest mb-1">Ganancia Neta Global</p><p className="font-black text-green-600 text-2xl">${(totalHistoricoVentasUSD - totalHistoricoGastosUSD).toFixed(2)}</p></div>
       </div>
     </div>
   );
@@ -1378,19 +1486,17 @@ function AdminKanban({ orders }) {
   );
 }
 
-// --- ADMIN DELIVERY REPARADO ---
+// --- ADMIN DELIVERY ---
 function AdminDeliveryRoute({ orders, bcvRate }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showAllDates, setShowAllDates] = useState(false);
   const [routeIds, setRouteIds] = useState([]);
 
-  // Limpiar la ruta solo si el usuario apaga/prende el switch de fechas
   useEffect(() => { setRouteIds([]); }, [showAllDates, selectedDate]);
 
-  // Filtramos la caja de disponibles (excluyendo cancelados, completados, PICKUPS y los que ya están en la ruta)
   const availableOrders = orders.filter(o => {
     if (o.status === 'Cancelado' || o.status === 'Completado') return false; 
-    if (o.deliveryMethod === 'Pickup') return false; // 🔴 LOS RETIROS NO VAN A LA RUTA
+    if (o.deliveryMethod === 'Pickup') return false;
     if (routeIds.includes(o.id)) return false; 
     
     if (showAllDates) return true;
@@ -1440,7 +1546,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* CAJA DE DISPONIBLES */}
         <div className="bg-white rounded-3xl shadow-sm border border-stone-200 flex flex-col h-[600px]">
           <div className="p-4 bg-stone-50 border-b border-stone-200 rounded-t-3xl flex justify-between items-center">
             <h3 className="font-bold text-stone-700 text-sm flex items-center gap-2"><Package className="w-4 h-4"/> Disponibles ({availableOrders.length})</h3>
@@ -1463,7 +1568,6 @@ function AdminDeliveryRoute({ orders, bcvRate }) {
           </div>
         </div>
 
-        {/* CAJA DE RUTA ARMADA */}
         <div className="bg-white rounded-3xl shadow-lg border-2 border-green-500 flex flex-col h-[600px] relative overflow-hidden">
           <div className="p-4 bg-green-50 border-b border-green-200 flex justify-between items-center">
             <h3 className="font-black text-green-800 flex items-center gap-2 text-lg"><Truck className="w-5 h-5"/> Ruta del Día ({routeOrders.length})</h3>
@@ -1504,7 +1608,6 @@ function ClientStorefront({ products, categories, coupons, cart, setCart, user, 
   
   const [previewProduct, setPreviewProduct] = useState(null);
   
-  // 🔴 AGREGADO deliveryMethod AL CLIENTE
   const [deliveryInfo, setDeliveryInfo] = useState({ deliveryMethod: 'Delivery', senderName: user?.name || '', senderPhone: user?.phone || '', recipientName: '', recipientPhone: '', deliveryAddress: user?.address || '', deliveryDate: '', deliveryTimeSlot: 'Mañana (8:00 AM - 12:00 PM)', dedication: '' });
   
   const [clientPayments, setClientPayments] = useState([]);
@@ -1566,7 +1669,6 @@ function ClientStorefront({ products, categories, coupons, cart, setCart, user, 
     e.preventDefault(); if (!storeIsOpen) return;
     const orderDisplayId = `PED-${Math.floor(Math.random() * 10000)}`;
     
-    // 🔴 Si escoge pickup, forzamos la dirección a Retiro en tienda
     const finalAddress = deliveryInfo.deliveryMethod === 'Pickup' ? 'Retiro en Tienda (Pickup)' : deliveryInfo.deliveryAddress;
 
     await addDoc(collection(db, 'orders'), {
@@ -1586,7 +1688,6 @@ function ClientStorefront({ products, categories, coupons, cart, setCart, user, 
 
     let text = `*¡Hola Decomer! Nuevo Pedido Web* 🍓🍫\n\n*Orden:* #${orderDisplayId}\n\n`;
     
-    // 🔴 ADAPTACIÓN DEL MENSAJE DEPENDIENDO DEL MÉTODO
     text += `*📍 MÉTODO:* ${deliveryInfo.deliveryMethod === 'Pickup' ? '🏪 RETIRO EN TIENDA (Pickup)' : '🛵 DELIVERY'}\n\n`;
     text += `*📤 EMISOR (Quien envía):*\n▪️ ${deliveryInfo.senderName} (${deliveryInfo.senderPhone})\n\n`;
     
@@ -1746,7 +1847,6 @@ function ClientStorefront({ products, categories, coupons, cart, setCart, user, 
              <div className="p-6 overflow-y-auto bg-white">
                 <form id="checkout-form" onSubmit={handleCheckout} className="space-y-6">
                   
-                  {/* 🔴 SELECTOR DE MÉTODO DE ENTREGA PARA EL CLIENTE */}
                   <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 mb-2">
                     <h4 className="text-sm font-bold mb-3 flex items-center gap-2 text-stone-700 uppercase tracking-wider"><MapPin className="w-4 h-4"/> Método de Entrega</h4>
                     <div className="grid grid-cols-2 gap-3">
@@ -1767,7 +1867,6 @@ function ClientStorefront({ products, categories, coupons, cart, setCart, user, 
                     )}
                   </div>
 
-                  {/* 🔴 OCULTAR DIRECCIÓN SI ES PICKUP O MOSTRAR DIRECCIÓN DE LA TIENDA */}
                   {deliveryInfo.deliveryMethod === 'Delivery' ? (
                     <div><label className="block text-xs font-bold mb-1">Dirección de Entrega Exacta</label><textarea required value={deliveryInfo.deliveryAddress} onChange={e=>setDeliveryInfo({...deliveryInfo, deliveryAddress:e.target.value})} className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm" placeholder="Ej: Urb. La Estrella, Calle 2, Casa #14..."/></div>
                   ) : (
